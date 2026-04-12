@@ -1,73 +1,48 @@
-# React + TypeScript + Vite
+# CheckMate - система управления заказами для официантов
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## 🚀 Технологии
 
-Currently, two official plugins are available:
+- **Frontend**: React 19, TypeScript, Vite 5
+- **UI**: Tailwind CSS, shadcn/ui
+- **Backend**: Supabase (PostgreSQL, Auth, Realtime)
+- **Routing**: React Router
+- **PWA**: vite-plugin-pwa
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 📦 Установка
 
-## React Compiler
+1. Клонируйте репозиторий
+2. Установите зависимости:
+   \`\`\`bash
+   npm install
+   \`\`\`
+3. Скопируйте \`.env.example\` в \`.env\` и добавьте ключи Supabase
+4. Запустите проект:
+   \`\`\`bash
+   npm run dev
+   \`\`\`
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🗄️ Настройка Supabase
 
-## Expanding the ESLint configuration
+1. Создайте проект в Supabase
+2. Выполните SQL запросы из \`docs/schema.sql\`
+3. Включите подтверждение email (или отключите для разработки)
+4. Добавьте URL редиректа: \`http://localhost:5173/auth/callback\`
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## 📁 Структура проекта (FSD)
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+\`\`\`
+src/
+├── app/          # Инициализация, роутинг, провайдеры
+├── pages/        # Страницы приложения
+├── features/     # Фичи (auth, orders, menu)
+├── entities/     # Бизнес-сущности
+├── shared/       # Переиспользуемый код
+└── widgets/      # Композитные компоненты
+\`\`\`
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## 🔒 Переменные окружения
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+\`\`\`env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+\`\`\`
