@@ -12,6 +12,7 @@
   "dependencies": {
     "@fontsource-variable/jetbrains-mono": "^5.2.8",
     "@phosphor-icons/react": "^2.1.10",
+    "@supabase/auth-ui-react": "^0.4.7",
     "@supabase/supabase-js": "^2.103.0",
     "class-variance-authority": "^0.7.1",
     "radix-ui": "^1.4.3",
