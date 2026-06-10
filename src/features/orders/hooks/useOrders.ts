@@ -3,34 +3,39 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/shared/api/supabase'
 import { ordersApi } from '../api/ordersApi'
 import type { Order } from '@/entities/order/model/order.model'
+import { useAuth } from '@/features/auth/useAuth'
 
 export const useOrders = () => {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { user, isLoading: isAuthLoading } = useAuth()
 
   const fetchOrders = useCallback(async () => {
     try {
       setLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) {
         setOrders([])
         return
       }
 
-      const activeOrders = await ordersApi.getActiveOrders(user.id)
-      setOrders(activeOrders)
-      console.log(orders.values)
+      const orders = await ordersApi.getOrders(user.id)
+      setOrders(orders)
+
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка загрузки заказов')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [user])
 
   useEffect(() => {
+    if (isAuthLoading) {
+      return
+    }
+
     fetchOrders()
 
     // Realtime подписка на изменения
@@ -52,7 +57,7 @@ export const useOrders = () => {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [fetchOrders])
+  }, [fetchOrders, isAuthLoading])
 
   return { orders, loading, error, refetch: fetchOrders }
 }

@@ -10,13 +10,13 @@ export const OrderList = ({ orders }: OrderListProps) => {
   if (orders.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">Нет активных заказов</p>
+        <p className="text-muted-foreground">Нет заказов</p>
       </div>
     )
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {orders.map((order) => (
         <OrderCard key={order.id} order={order} />
       ))}

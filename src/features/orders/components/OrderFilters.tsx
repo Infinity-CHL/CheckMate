@@ -1,6 +1,5 @@
-// Фильтры (по статусу, дате)
 import { Button } from '@/components/ui/button'
-import { ORDER_STATUS, ORDER_STATUS_LABELS, type OrderStatus } from '@/entities/order/constants/order.constants'
+import { ORDER_STATUS, type OrderStatus } from '@/entities/order/constants/order.constants'
 
 interface OrderFiltersProps {
   activeFilter: OrderStatus | 'all'
@@ -8,21 +7,20 @@ interface OrderFiltersProps {
 }
 
 const filters: Array<{ value: 'all' | OrderStatus; label: string }> = [
+  { value: ORDER_STATUS.OPEN, label: 'Активные' },
+  { value: ORDER_STATUS.CLOSED, label: 'Закрытые' },
   { value: 'all', label: 'Все' },
-  { value: ORDER_STATUS.ACTIVE, label: ORDER_STATUS_LABELS[ORDER_STATUS.ACTIVE] },
-  { value: ORDER_STATUS.PREPARING, label: ORDER_STATUS_LABELS[ORDER_STATUS.PREPARING] },
-  { value: ORDER_STATUS.READY, label: ORDER_STATUS_LABELS[ORDER_STATUS.READY] },
 ]
 
 export const OrderFilters = ({ activeFilter, onFilterChange }: OrderFiltersProps) => {
   return (
-    <div className="flex flex-wrap gap-2 mb-6">
+    <div className="grid grid-cols-3 gap-2 mb-6 sm:flex sm:flex-wrap">
       {filters.map((filter) => (
         <Button
           key={filter.value}
           variant={activeFilter === filter.value ? 'default' : 'outline'}
           onClick={() => onFilterChange(filter.value)}
-          className="capitalize"
+          className="h-11"
         >
           {filter.label}
         </Button>
