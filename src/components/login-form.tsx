@@ -21,24 +21,22 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
   const [isLoading, setIsLoading] = useState(false)
   const navigate = useNavigate()  // ← добавить для навигации
 
-  // const supabase = createClient()
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError(null)
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
-      
+
       if (error) throw error
-      
+
       // ✅ Правильный редирект через React Router
       navigate('/')  // или location.href = '/' - оба работают
-      
+
     } catch (error: unknown) {
       console.error('Login error:', error)
       setError(error instanceof Error ? error.message : 'An error occurred')

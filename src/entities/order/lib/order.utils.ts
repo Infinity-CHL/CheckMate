@@ -1,6 +1,6 @@
 // Форматирование статусов, подсчёт суммы
 import { ORDER_STATUS_LABELS, type OrderStatus } from '@/entities/order/constants/order.constants'
-import type { Order, OrderItem } from '@/entities/order/model/order.model'
+import type { OrderItem } from '@/entities/order/model/order.model'
 
 export const getStatusLabel = (status: OrderStatus): string => {
   return ORDER_STATUS_LABELS[status] || status
@@ -17,5 +17,5 @@ export const formatDate = (dateString: string): string => {
 }
 
 export const calculateTotal = (items: OrderItem[]): number => {
-  return items.reduce((sum, item) => sum + item.subtotal, 0)
+  return items.reduce((sum, item) => sum + item.price * item.quantity, 0)
 }

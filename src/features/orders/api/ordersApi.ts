@@ -1,28 +1,43 @@
 import { supabase } from '@/shared/api/supabase'
 import type { Order, OrderItem, CreateOrderData, CreateOrderItemData } from '@/entities/order/model/order.model'
+import { ORDER_ITEM_STATUS, type OrderItemStatus } from '@/entities/order/constants/order-item.constants'
 import { ORDER_STATUS } from '@/entities/order/constants/order.constants'
+import { TABLE_STATUS } from '@/entities/table/constants/table.constants'
 
 export const ordersApi = {
-  // Получить активные заказы (не оплаченные и не отменённые)
-  async getActiveOrders(waiterId: string): Promise<Order[]> {
+  async getOrders(waiterId: string): Promise<Order[]> {
     const { data, error } = await supabase
       .from('orders')
-      .select('*')
+      .select('*, table:tables(id, number), order_items(id)')
       .eq('waiter_id', waiterId)
-      .in('status', [ORDER_STATUS.ACTIVE, ORDER_STATUS.PREPARING, ORDER_STATUS.READY])
+      .in('status', [ORDER_STATUS.OPEN, ORDER_STATUS.CLOSED, ORDER_STATUS.CANCELLED])
       .order('created_at', { ascending: false })
 
     if (error) throw error
-    return data || []
+
+    return (data || []).filter(
+      (order) => order.status !== ORDER_STATUS.OPEN || (order.order_items || []).length > 0
+    )
   },
 
-  // Получить историю заказов (оплаченные и отменённые)
+  async getActiveOrders(waiterId: string): Promise<Order[]> {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*, table:tables(id, number), order_items(id)')
+      .eq('waiter_id', waiterId)
+      .eq('status', ORDER_STATUS.OPEN)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return (data || []).filter((order) => (order.order_items || []).length > 0)
+  },
+
   async getOrderHistory(waiterId: string): Promise<Order[]> {
     const { data, error } = await supabase
       .from('orders')
-      .select('*')
+      .select('*, table:tables(id, number)')
       .eq('waiter_id', waiterId)
-      .in('status', [ORDER_STATUS.PAID, ORDER_STATUS.CANCELLED])
+      .in('status', [ORDER_STATUS.CLOSED, ORDER_STATUS.CANCELLED])
       .order('created_at', { ascending: false })
       .limit(50)
 
@@ -30,29 +45,18 @@ export const ordersApi = {
     return data || []
   },
 
-  // Получить детали заказа с товарами
   async getOrderDetails(orderId: string): Promise<{ order: Order; items: OrderItem[] }> {
-    // Сначала получаем заказ
     const { data: order, error: orderError } = await supabase
       .from('orders')
-      .select('*')
+      .select('*, table:tables(id, number)')
       .eq('id', orderId)
       .single()
 
     if (orderError) throw orderError
 
-    // Получаем товары с информацией о продуктах
     const { data: items, error: itemsError } = await supabase
       .from('order_items')
-      .select(`
-        *,
-        product:products (
-          id,
-          name,
-          price,
-          category
-        )
-      `)
+      .select('*, menu_item:menu_items(id, name, price, category)')
       .eq('order_id', orderId)
 
     if (itemsError) throw itemsError
@@ -60,68 +64,197 @@ export const ordersApi = {
     return { order, items: items || [] }
   },
 
-  // Создать новый заказ
   async createOrder(waiterId: string, data: CreateOrderData): Promise<Order> {
+    const { data: existingOrder, error: existingOrderError } = await supabase
+      .from('orders')
+      .select('*, table:tables(id, number)')
+      .eq('table_id', data.table_id)
+      .eq('status', ORDER_STATUS.OPEN)
+      .limit(1)
+      .maybeSingle()
+
+    if (existingOrderError) throw existingOrderError
+
+    if (existingOrder) {
+      return existingOrder
+    }
+
     const { data: order, error } = await supabase
       .from('orders')
       .insert({
         waiter_id: waiterId,
-        table_number: data.table_number,
-        comment: data.comment || null,
-        status: ORDER_STATUS.ACTIVE,
-        total_amount: 0
+        table_id: data.table_id,
+        status: ORDER_STATUS.OPEN,
+        total_amount: 0,
       })
-      .select()
+      .select('*, table:tables(id, number)')
       .single()
 
     if (error) throw error
     return order
   },
 
-  // Добавить товар в заказ
   async addOrderItem(orderId: string, data: CreateOrderItemData): Promise<OrderItem> {
     const { data: item, error } = await supabase
       .from('order_items')
       .insert({
         order_id: orderId,
-        product_id: data.product_id,
+        menu_item_id: data.menu_item_id,
         quantity: data.quantity,
-        unit_price: data.unit_price
+        price: data.price,
+        status: ORDER_ITEM_STATUS.PREPARING,
       })
-      .select()
+      .select('*, menu_item:menu_items(id, name, price, category)')
       .single()
 
-    if (error) throw error
+    if (error) {
+      console.error('ordersApi.addOrderItem insert error:', error)
+      throw error
+    }
     return item
   },
 
-  // Обновить статус заказа
   async updateOrderStatus(orderId: string, status: string): Promise<void> {
     const { error } = await supabase
       .from('orders')
       .update({ status })
       .eq('id', orderId)
 
-    if (error) throw error
+    if (error) {
+      console.error('ordersApi.updateOrderStatus update error:', error)
+      throw error
+    }
   },
 
-  // Удалить товар из заказа
+  async closeOrder(orderId: string): Promise<void> {
+    const { data: order, error: orderSelectError } = await supabase
+      .from('orders')
+      .select('id, table_id')
+      .eq('id', orderId)
+      .single()
+
+    if (orderSelectError) {
+      console.error('ordersApi.closeOrder order select error:', orderSelectError)
+      throw orderSelectError
+    }
+
+    const { error: orderUpdateError } = await supabase
+      .from('orders')
+      .update({
+        status: ORDER_STATUS.CLOSED,
+        closed_at: new Date().toISOString(),
+      })
+      .eq('id', orderId)
+
+    if (orderUpdateError) {
+      console.error('ordersApi.closeOrder order update error:', orderUpdateError)
+      throw orderUpdateError
+    }
+
+    const { error: tableUpdateError } = await supabase
+      .from('tables')
+      .update({ status: TABLE_STATUS.FREE })
+      .eq('id', order.table_id)
+
+    if (tableUpdateError) {
+      console.error('ordersApi.closeOrder table update error:', tableUpdateError)
+      throw tableUpdateError
+    }
+  },
+
   async removeOrderItem(itemId: string): Promise<void> {
     const { error } = await supabase
       .from('order_items')
       .delete()
       .eq('id', itemId)
 
-    if (error) throw error
+    if (error) {
+      console.error('ordersApi.removeOrderItem delete error:', error)
+      throw error
+    }
   },
 
-  // Обновить количество товара
   async updateOrderItemQuantity(itemId: string, quantity: number): Promise<void> {
     const { error } = await supabase
       .from('order_items')
       .update({ quantity })
       .eq('id', itemId)
 
-    if (error) throw error
-  }
+    if (error) {
+      console.error('ordersApi.updateOrderItemQuantity update error:', error)
+      throw error
+    }
+  },
+
+  async updateOrderItemStatus(
+    itemId: string,
+    status: OrderItemStatus
+  ): Promise<void> {
+    const { error } = await supabase
+      .from('order_items')
+      .update({ status })
+      .eq('id', itemId)
+
+    if (error) {
+      console.error('ordersApi.updateOrderItemStatus update error:', error)
+      throw error
+    }
+  },
+
+  async deleteOrder(orderId: string): Promise<void> {
+    const { data: order, error: orderSelectError } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('id', orderId)
+      .single()
+
+    if (orderSelectError) {
+      console.error('ordersApi.deleteOrder order select error:', orderSelectError)
+      throw orderSelectError
+    }
+
+    const { error: itemsError } = await supabase
+      .from('order_items')
+      .delete()
+      .eq('order_id', orderId)
+
+    if (itemsError) {
+      console.error('ordersApi.deleteOrder order_items delete error:', itemsError)
+      throw itemsError
+    }
+
+    const { error: orderError } = await supabase
+      .from('orders')
+      .delete()
+      .eq('id', orderId)
+
+    if (orderError) {
+      console.error('ordersApi.deleteOrder orders delete error:', orderError)
+      throw orderError
+    }
+
+    const { data: openOrders, error: openOrdersError } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('table_id', order.table_id)
+      .eq('status', ORDER_STATUS.OPEN)
+      .limit(1)
+
+    if (openOrdersError) {
+      console.error('ordersApi.deleteOrder open orders select error:', openOrdersError)
+      throw openOrdersError
+    }
+
+    if ((openOrders || []).length === 0) {
+      const { error: tableError } = await supabase
+        .from('tables')
+        .update({ status: 'free' })
+        .eq('id', order.table_id)
+
+      if (tableError) {
+        console.error('ordersApi.deleteOrder table status update error:', tableError)
+        throw tableError
+      }
+    }
+  },
 }

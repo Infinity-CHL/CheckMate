@@ -1,41 +1,41 @@
-// Типы и интерфейсы Order
-
+import type { MenuItem } from '@/entities/menu/model/menu-item.model'
 import type { OrderStatus } from '@/entities/order/constants/order.constants'
+import type { OrderItemStatus } from '@/entities/order/constants/order-item.constants'
 
 export interface Order {
   id: string
+  table_id: string
   waiter_id: string
-  table_number: number
   status: OrderStatus
   total_amount: number
-  comment: string | null
   created_at: string
-  updated_at: string
+  closed_at: string | null
+  table?: {
+    id: string
+    number: number
+  } | null
+  order_items?: Array<{
+    id: string
+  }>
 }
 
 export interface OrderItem {
   id: string
   order_id: string
-  product_id: string
+  menu_item_id: string
   quantity: number
-  unit_price: number
-  subtotal: number
-  created_at: string
-  product?: {
-    id: string
-    name: string
-    price: number
-    category: string
-  }
+  price: number
+  note: string | null
+  status: OrderItemStatus | string | null
+  menu_item?: MenuItem | null
 }
 
 export interface CreateOrderData {
-  table_number: number
-  comment?: string
+  table_id: string
 }
 
 export interface CreateOrderItemData {
-  product_id: string
+  menu_item_id: string
   quantity: number
-  unit_price: number
+  price: number
 }

@@ -1,35 +1,62 @@
-import { useParams, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { useLocation, useParams, useNavigate } from 'react-router-dom'
+import { PageHeader } from '@/components/PageHeader'
 import { useOrderDetails } from '@/features/orders/hooks/useOrderDetails'
 import { OrderItemsTable } from '@/features/orders/components/OrderItemsTable'
 import { OrderStatusBadge } from '@/features/orders/components/OrderStatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { ArrowLeft, Truck, CheckCircle, CreditCard, XCircle } from 'lucide-react'
+import { CheckCircle, Pencil, Trash2, XCircle } from 'lucide-react'
 import { ORDER_STATUS } from '@/entities/order/constants/order.constants'
 import { formatDate } from '@/entities/order/lib/order.utils'
-import { supabase } from '@/shared/api/supabase'
-import { useState, useEffect } from 'react'
+import { useAuth } from '@/features/auth/useAuth'
 
 export const OrderDetailsPage = () => {
   const { orderId } = useParams<{ orderId: string }>()
   const navigate = useNavigate()
-  const { order, items, loading, error, updateStatus, removeItem, refetch } = useOrderDetails(orderId)
-  const [isAdmin, setIsAdmin] = useState(false)
+  const location = useLocation()
+  const {
+    order,
+    items,
+    loading,
+    error,
+    updateStatus,
+    closeOrder,
+    removeItem,
+    updateItemStatus,
+    deleteOrder,
+  } = useOrderDetails(orderId)
+  const { profile } = useAuth()
+  const [showCloseConfirmation, setShowCloseConfirmation] = useState(false)
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false)
+  const [closing, setClosing] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const isAdmin = profile?.role === 'admin'
+  const ordersBackTo =
+    (location.state as { from?: string } | null)?.from ||
+    `/orders${location.search}`
 
-  useEffect(() => {
-    const checkAdmin = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', user.id)
-          .single()
-        setIsAdmin(data?.role === 'admin')
-      }
+  const handleCloseOrder = async () => {
+    try {
+      setClosing(true)
+      await closeOrder()
+      navigate(ordersBackTo)
+    } catch (err) {
+      console.error('OrderDetailsPage handleCloseOrder error:', err)
+    } finally {
+      setClosing(false)
     }
-    checkAdmin()
-  }, [])
+  }
+
+  const handleDeleteOrder = async () => {
+    try {
+      setDeleting(true)
+      await deleteOrder()
+      navigate(ordersBackTo)
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -43,49 +70,27 @@ export const OrderDetailsPage = () => {
     return (
       <div className="text-center py-12">
         <p className="text-red-500">Ошибка: {error || 'Заказ не найден'}</p>
-        <Button onClick={() => navigate('/orders')} className="mt-4">
+        <Button onClick={() => navigate(ordersBackTo)} className="mt-4">
           Вернуться к заказам
         </Button>
       </div>
     )
   }
 
-  const statusActions = {
-    [ORDER_STATUS.ACTIVE]: {
-      nextStatus: ORDER_STATUS.PREPARING,
-      label: 'Начать готовку',
-      icon: Truck,
-      variant: 'default'
-    },
-    [ORDER_STATUS.PREPARING]: {
-      nextStatus: ORDER_STATUS.READY,
-      label: 'Готов к выдаче',
-      icon: CheckCircle,
-      variant: 'default'
-    },
-    [ORDER_STATUS.READY]: {
-      nextStatus: ORDER_STATUS.PAID,
-      label: 'Оплачен',
-      icon: CreditCard,
-      variant: 'default'
-    }
-  }
-
-  const action = statusActions[order.status as keyof typeof statusActions]
+  const canCloseOrder = order.status === ORDER_STATUS.OPEN
+  const canEditOrder = order.status === ORDER_STATUS.OPEN
+  const canUpdateOrder = isAdmin && order.status === ORDER_STATUS.OPEN
 
   return (
-    <div className="container mx-auto p-4 max-w-4xl">
-      <Button variant="ghost" onClick={() => navigate('/orders')} className="mb-4">
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        Назад к заказам
-      </Button>
+    <div className="container mx-auto p-4 pb-6 max-w-4xl md:p-6">
+      <PageHeader title="Детали заказа" backTo={ordersBackTo} />
 
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-start">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <CardTitle className="text-2xl mb-2">
-                Заказ стола №{order.table_number}
+              <CardTitle className="mb-2 text-lg">
+                Заказ стола №{order.table?.number ?? '—'}
               </CardTitle>
               <div className="flex gap-2 items-center">
                 <OrderStatusBadge status={order.status} />
@@ -94,39 +99,128 @@ export const OrderDetailsPage = () => {
                 </span>
               </div>
             </div>
-            {action && isAdmin && order.status !== ORDER_STATUS.PAID && order.status !== ORDER_STATUS.CANCELLED && (
-              <Button onClick={() => updateStatus(action.nextStatus)}>
-                <action.icon className="mr-2 h-4 w-4" />
-                {action.label}
-              </Button>
-            )}
-            {isAdmin && order.status !== ORDER_STATUS.CANCELLED && order.status !== ORDER_STATUS.PAID && (
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
+              {canEditOrder && <Button
+                className="h-11"
+                onClick={() =>
+                  navigate(`/orders/${order.id}/edit${location.search}`, {
+                    state: { from: ordersBackTo },
+                  })
+                }
+              >
+                <Pencil className="mr-2 h-4 w-4" />
+                Редактировать заказ
+              </Button>}
+              {canUpdateOrder && (
+                <>
+                  <Button className="h-11" onClick={() => setShowCloseConfirmation(true)}>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Закрыть заказ
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    className="h-11"
+                    onClick={() => updateStatus(ORDER_STATUS.CANCELLED)}
+                  >
+                    <XCircle className="mr-2 h-4 w-4" />
+                    Отменить заказ
+                  </Button>
+                </>
+              )}
+              {!isAdmin && canCloseOrder && (
+                <Button className="h-11" onClick={() => setShowCloseConfirmation(true)}>
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  Закрыть заказ
+                </Button>
+              )}
               <Button
                 variant="destructive"
-                onClick={() => updateStatus(ORDER_STATUS.CANCELLED)}
+                className="h-11"
+                onClick={() => setShowDeleteConfirmation(true)}
               >
-                <XCircle className="mr-2 h-4 w-4" />
-                Отменить заказ
+                <Trash2 className="mr-2 h-4 w-4" />
+                Удалить заказ
               </Button>
-            )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
-          {order.comment && (
-            <div className="mb-4 p-3 bg-muted rounded-lg">
-              <p className="text-sm font-medium">Комментарий:</p>
-              <p className="text-sm">{order.comment}</p>
-            </div>
-          )}
-
           <h3 className="font-semibold mb-3">Состав заказа</h3>
           <OrderItemsTable
             items={items}
             onRemoveItem={isAdmin ? removeItem : undefined}
+            onUpdateItemStatus={canEditOrder ? updateItemStatus : undefined}
+            isReadOnly={!canEditOrder}
             isAdmin={isAdmin}
           />
         </CardContent>
       </Card>
+
+      {showCloseConfirmation && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm">
+            <Card>
+              <CardHeader>
+                <CardTitle>Закрыть заказ?</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  После закрытия стол станет свободным, а заказ попадёт в историю.
+                </p>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowCloseConfirmation(false)}
+                    disabled={closing}
+                  >
+                    Нет
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleCloseOrder}
+                    disabled={closing}
+                  >
+                    {closing ? 'Закрытие...' : 'Да'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {showDeleteConfirmation && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm">
+            <Card>
+              <CardHeader>
+                <CardTitle>Удалить заказ?</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowDeleteConfirmation(false)}
+                    disabled={deleting}
+                  >
+                    Нет
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={handleDeleteOrder}
+                    disabled={deleting}
+                  >
+                    {deleting ? 'Удаление...' : 'Да'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

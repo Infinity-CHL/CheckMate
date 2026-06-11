@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/shared/api/supabase'
 import { ordersApi } from '../api/ordersApi'
 import type { Order, OrderItem } from '@/entities/order/model/order.model'
+import type { OrderItemStatus } from '@/entities/order/constants/order-item.constants'
+import { removeOrderDraft } from '@/features/table-order/lib/orderDraftStorage'
 
 export const useOrderDetails = (orderId: string | undefined) => {
   const [order, setOrder] = useState<Order | null>(null)
@@ -62,11 +64,23 @@ export const useOrderDetails = (orderId: string | undefined) => {
     }
   }, [orderId, fetchOrderDetails])
 
-  const addItem = useCallback(async (productId: string, quantity: number, unitPrice: number) => {
+  const closeOrder = useCallback(async () => {
     if (!orderId) return
 
     try {
-      await ordersApi.addOrderItem(orderId, { product_id: productId, quantity, unit_price: unitPrice })
+      await ordersApi.closeOrder(orderId)
+    } catch (err) {
+      console.error('useOrderDetails.closeOrder error:', err)
+      setError(err instanceof Error ? err.message : 'Ошибка закрытия заказа')
+      throw err
+    }
+  }, [orderId])
+
+  const addItem = useCallback(async (menuItemId: string, quantity: number, price: number) => {
+    if (!orderId) return
+
+    try {
+      await ordersApi.addOrderItem(orderId, { menu_item_id: menuItemId, quantity, price })
       await fetchOrderDetails()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка добавления товара')
@@ -82,5 +96,32 @@ export const useOrderDetails = (orderId: string | undefined) => {
     }
   }, [fetchOrderDetails])
 
-  return { order, items, loading, error, updateStatus, addItem, removeItem, refetch: fetchOrderDetails }
+  const updateItemStatus = useCallback(async (
+    itemId: string,
+    status: OrderItemStatus
+  ) => {
+    try {
+      await ordersApi.updateOrderItemStatus(itemId, status)
+      await fetchOrderDetails()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка обновления статуса позиции')
+      throw err
+    }
+  }, [fetchOrderDetails])
+
+  const deleteOrder = useCallback(async () => {
+    if (!orderId) return
+
+    try {
+      await ordersApi.deleteOrder(orderId)
+      if (order?.table_id) {
+        removeOrderDraft(order.table_id)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка удаления заказа')
+      throw err
+    }
+  }, [order?.table_id, orderId])
+
+  return { order, items, loading, error, updateStatus, closeOrder, addItem, removeItem, updateItemStatus, deleteOrder, refetch: fetchOrderDetails }
 }
