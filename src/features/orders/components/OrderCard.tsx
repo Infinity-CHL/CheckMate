@@ -10,12 +10,40 @@ interface OrderCardProps {
   order: Order
 }
 
+const getOrdersStatus = (search: string) => {
+  const status = new URLSearchParams(search).get('status')
+
+  if (
+    status === ORDER_STATUS.OPEN ||
+    status === ORDER_STATUS.CLOSED ||
+    status === 'all'
+  ) {
+    return status
+  }
+
+  return ORDER_STATUS.OPEN
+}
+
+const getScrollKey = (status: string) =>
+  `checkmate:orders-scroll:${status}`
+
+const getScrollY = () =>
+  window.scrollY || document.scrollingElement?.scrollTop || 0
+
 export const OrderCard = ({ order }: OrderCardProps) => {
   const navigate = useNavigate()
   const location = useLocation()
 
   const handleClick = () => {
     const from = `/orders${location.search}`
+    const status = getOrdersStatus(location.search)
+    const scrollState = {
+      scrollY: getScrollY(),
+      status,
+      path: `${location.pathname}${location.search}`,
+    }
+
+    sessionStorage.setItem(getScrollKey(status), JSON.stringify(scrollState))
 
     navigate(`/orders/${order.id}${location.search}`, {
       state: { from },

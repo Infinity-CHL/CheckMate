@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { ORDER_STATUS, type OrderStatus } from '@/entities/order/constants/order.constants'
@@ -8,6 +8,12 @@ import { useOrders } from '@/features/orders/hooks/useOrders'
 import { Plus } from 'lucide-react'
 
 type OrdersFilter = OrderStatus | 'all'
+
+type OrdersScrollState = {
+  scrollY: number
+  status: OrdersFilter
+  path: string
+}
 
 const ORDERS_FILTERS: OrdersFilter[] = [
   ORDER_STATUS.OPEN,
@@ -24,12 +30,41 @@ const getValidFilter = (status: string | null): OrdersFilter => {
 const getScrollKey = (status: OrdersFilter) =>
   `checkmate:orders-scroll:${status}`
 
+const readScrollState = (status: OrdersFilter): OrdersScrollState | null => {
+  const rawState = sessionStorage.getItem(getScrollKey(status))
+
+  if (!rawState) {
+    return null
+  }
+
+  try {
+    const state = JSON.parse(rawState) as Partial<OrdersScrollState>
+
+    if (
+      state.status !== status ||
+      typeof state.scrollY !== 'number' ||
+      Number.isNaN(state.scrollY)
+    ) {
+      return null
+    }
+
+    return {
+      scrollY: state.scrollY,
+      status,
+      path: state.path ?? `/orders?status=${status}`,
+    }
+  } catch {
+    return null
+  }
+}
+
 export const OrdersPage = () => {
   const { orders, loading, error } = useOrders()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const filter = getValidFilter(searchParams.get('status'))
-  const filterRef = useRef(filter)
+  const skipNextRestoreRef = useRef(false)
+  const restoredScrollRef = useRef<string | null>(null)
 
   const filteredOrders = useMemo(
     () =>
@@ -40,38 +75,58 @@ export const OrdersPage = () => {
   )
 
   useEffect(() => {
-    filterRef.current = filter
-  }, [filter])
-
-  useEffect(() => {
     if (searchParams.get('status') !== filter) {
       setSearchParams({ status: filter }, { replace: true })
     }
   }, [filter, searchParams, setSearchParams])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (loading) {
       return
     }
 
-    const scrollY = Number(sessionStorage.getItem(getScrollKey(filter)) ?? 0)
-
-    requestAnimationFrame(() => {
-      window.scrollTo(0, scrollY)
-    })
-  }, [filter, filteredOrders.length, loading])
-
-  useEffect(() => {
-    return () => {
-      sessionStorage.setItem(
-        getScrollKey(filterRef.current),
-        String(window.scrollY)
-      )
+    if (skipNextRestoreRef.current) {
+      skipNextRestoreRef.current = false
+      return
     }
-  }, [])
+
+    if (orders.length === 0) {
+      return
+    }
+
+    const scrollState = readScrollState(filter)
+
+    if (!scrollState) {
+      return
+    }
+
+    const restoreKey = `${scrollState.status}:${scrollState.scrollY}:${scrollState.path}`
+
+    if (restoredScrollRef.current === restoreKey) {
+      return
+    }
+
+    window.scrollTo({ top: scrollState.scrollY, behavior: 'auto' })
+
+    if (document.scrollingElement) {
+      document.scrollingElement.scrollTop = scrollState.scrollY
+    }
+
+    const animationFrameId = window.requestAnimationFrame(() => {
+      window.scrollTo({ top: scrollState.scrollY, behavior: 'auto' })
+
+      if (document.scrollingElement) {
+        document.scrollingElement.scrollTop = scrollState.scrollY
+      }
+      restoredScrollRef.current = restoreKey
+    })
+
+    return () => window.cancelAnimationFrame(animationFrameId)
+  }, [filter, loading, orders.length])
 
   const handleFilterChange = (nextFilter: OrdersFilter) => {
-    sessionStorage.setItem(getScrollKey(filter), String(window.scrollY))
+    sessionStorage.removeItem(getScrollKey(nextFilter))
+    skipNextRestoreRef.current = true
     setSearchParams({ status: nextFilter })
   }
 
