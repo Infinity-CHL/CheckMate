@@ -1,5 +1,5 @@
 import { Outlet, Link, NavLink, useNavigate } from 'react-router-dom'
-import { BarChart3, ClipboardList, LayoutGrid, LogOut } from 'lucide-react'
+import { BarChart3, ClipboardList, LayoutGrid, LogOut, UtensilsCrossed } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/features/auth/useAuth'
 
@@ -20,13 +20,26 @@ export const RootLayout = () => {
             CheckMate
           </Link>
 
+          {user && (
+            <Link
+              to="/menu"
+              className="flex min-h-10 items-center gap-2 px-3 text-sm font-medium md:hidden"
+            >
+              <UtensilsCrossed className="h-4 w-4" />
+              Меню
+            </Link>
+          )}
+
           <nav className="hidden items-center gap-4 md:flex">
             {user ? (
               <>
                 <Link to="/orders">Заказы</Link>
                 <Link to="/tables">Столы</Link>
                 <Link to="/dashboard">Dashboard</Link>
-                <Link to="/menu">Меню</Link>
+                <Link to="/menu" className="inline-flex items-center gap-2">
+                  <UtensilsCrossed className="h-4 w-4" />
+                  Меню
+                </Link>
                 <Button variant="outline" onClick={handleLogout}>
                   Выйти
                 </Button>

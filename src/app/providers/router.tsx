@@ -8,6 +8,7 @@ import { CreateOrderPage } from '@/pages/orders/CreateOrderPage'
 import { TablesPage } from '@/pages/tables/TablesPage'
 import { TableOrderPage } from '@/pages/tables/TableOrderPage'
 import { DashboardPage } from '@/pages/dashboard/DashboardPage'
+import { MenuPage } from '@/pages/menu/MenuPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { SignUpPage } from '@/pages/SignUpPage'
 import { AuthCallback } from '@/pages/auth/AuthCallback'
@@ -20,6 +21,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <ProtectedRoute><OrdersPage /></ProtectedRoute> },
       { path: 'dashboard', element: <ProtectedRoute><DashboardPage /></ProtectedRoute> },
+      { path: 'menu', element: <ProtectedRoute><MenuPage /></ProtectedRoute> },
       { path: 'tables', element: <ProtectedRoute><TablesPage /></ProtectedRoute> },
       { path: 'tables/:tableId/order', element: <ProtectedRoute><TableOrderPage /></ProtectedRoute> },
       { path: 'orders', element: <ProtectedRoute><OrdersPage /></ProtectedRoute> },
