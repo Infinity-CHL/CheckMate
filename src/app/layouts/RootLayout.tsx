@@ -1,16 +1,9 @@
-import { Outlet, Link, NavLink, useNavigate } from 'react-router-dom'
-import { BarChart3, ClipboardList, LayoutGrid, LogOut, UtensilsCrossed } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Outlet, Link, NavLink } from 'react-router-dom'
+import { BarChart3, ClipboardList, LayoutGrid, User, UtensilsCrossed } from 'lucide-react'
 import { useAuth } from '@/features/auth/useAuth'
 
 export const RootLayout = () => {
-  const { user, signOut } = useAuth()
-  const navigate = useNavigate()
-
-  const handleLogout = async () => {
-    await signOut()
-    navigate('/login')
-  }
+  const { user } = useAuth()
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -40,9 +33,10 @@ export const RootLayout = () => {
                   <UtensilsCrossed className="h-4 w-4" />
                   Меню
                 </Link>
-                <Button variant="outline" onClick={handleLogout}>
-                  Выйти
-                </Button>
+                <Link to="/profile" className="inline-flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Профиль
+                </Link>
               </>
             ) : (
               <>
@@ -88,14 +82,15 @@ export const RootLayout = () => {
               <BarChart3 className="h-5 w-5" />
               <span>Аналитика</span>
             </NavLink>
-            <button
-              type="button"
-              className="flex min-h-14 flex-col items-center justify-center gap-1 px-2 text-xs font-medium text-muted-foreground"
-              onClick={handleLogout}
+            <NavLink
+              to="/profile"
+              className={({ isActive }) =>
+                `flex min-h-14 flex-col items-center justify-center gap-1 px-2 text-xs font-medium ${isActive ? 'text-primary' : 'text-muted-foreground'}`
+              }
             >
-              <LogOut className="h-5 w-5" />
-              <span>Выйти</span>
-            </button>
+              <User className="h-5 w-5" />
+              <span>Профиль</span>
+            </NavLink>
           </div>
         </nav>
       )}
