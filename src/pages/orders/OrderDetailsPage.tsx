@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useLocation, useParams, useNavigate } from 'react-router-dom'
+import { PageHeader } from '@/components/PageHeader'
 import { useOrderDetails } from '@/features/orders/hooks/useOrderDetails'
 import { OrderItemsTable } from '@/features/orders/components/OrderItemsTable'
 import { OrderStatusBadge } from '@/features/orders/components/OrderStatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { ArrowLeft, CheckCircle, Pencil, Trash2, XCircle } from 'lucide-react'
+import { CheckCircle, Pencil, Trash2, XCircle } from 'lucide-react'
 import { ORDER_STATUS } from '@/entities/order/constants/order.constants'
 import { formatDate } from '@/entities/order/lib/order.utils'
 import { useAuth } from '@/features/auth/useAuth'
@@ -31,7 +32,7 @@ export const OrderDetailsPage = () => {
   const [closing, setClosing] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const isAdmin = profile?.role === 'admin'
-  const backPath =
+  const ordersBackTo =
     (location.state as { from?: string } | null)?.from ||
     `/orders${location.search}`
 
@@ -39,7 +40,7 @@ export const OrderDetailsPage = () => {
     try {
       setClosing(true)
       await closeOrder()
-      navigate(backPath)
+      navigate(ordersBackTo)
     } catch (err) {
       console.error('OrderDetailsPage handleCloseOrder error:', err)
     } finally {
@@ -51,7 +52,7 @@ export const OrderDetailsPage = () => {
     try {
       setDeleting(true)
       await deleteOrder()
-      navigate(backPath)
+      navigate(ordersBackTo)
     } finally {
       setDeleting(false)
     }
@@ -69,7 +70,7 @@ export const OrderDetailsPage = () => {
     return (
       <div className="text-center py-12">
         <p className="text-red-500">Ошибка: {error || 'Заказ не найден'}</p>
-        <Button onClick={() => navigate(backPath)} className="mt-4">
+        <Button onClick={() => navigate(ordersBackTo)} className="mt-4">
           Вернуться к заказам
         </Button>
       </div>
@@ -82,16 +83,13 @@ export const OrderDetailsPage = () => {
 
   return (
     <div className="container mx-auto p-4 pb-6 max-w-4xl md:p-6">
-      <Button variant="ghost" onClick={() => navigate(backPath)} className="mb-4 h-11">
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        Назад к заказам
-      </Button>
+      <PageHeader title="Детали заказа" backTo={ordersBackTo} />
 
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <CardTitle className="text-2xl mb-2">
+              <CardTitle className="mb-2 text-lg">
                 Заказ стола №{order.table?.number ?? '—'}
               </CardTitle>
               <div className="flex gap-2 items-center">
@@ -102,7 +100,14 @@ export const OrderDetailsPage = () => {
               </div>
             </div>
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
-              {canEditOrder && <Button className="h-11" onClick={() => navigate(`/orders/${order.id}/edit`)}>
+              {canEditOrder && <Button
+                className="h-11"
+                onClick={() =>
+                  navigate(`/orders/${order.id}/edit${location.search}`, {
+                    state: { from: ordersBackTo },
+                  })
+                }
+              >
                 <Pencil className="mr-2 h-4 w-4" />
                 Редактировать заказ
               </Button>}

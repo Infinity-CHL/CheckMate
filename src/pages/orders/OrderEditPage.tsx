@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Trash2 } from 'lucide-react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -14,7 +15,6 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import type { MenuItem } from '@/entities/menu/model/menu-item.model'
-import type { RestaurantTable } from '@/entities/table/model/table.model'
 import { ordersApi } from '@/features/orders/api/ordersApi'
 import { getMenuItems } from '@/features/menu/api/menuApi'
 import {
@@ -23,12 +23,11 @@ import {
   type LocalOrderItem,
   type TableOrder,
 } from '@/features/table-order/api/tableOrderApi'
-import { getTableById } from '@/features/tables/api/tablesApi'
 
 export const OrderEditPage = () => {
   const { orderId } = useParams<{ orderId: string }>()
   const navigate = useNavigate()
-  const [table, setTable] = useState<RestaurantTable | null>(null)
+  const location = useLocation()
   const [order, setOrder] = useState<TableOrder | null>(null)
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [orderItems, setOrderItems] = useState<LocalOrderItem[]>([])
@@ -36,6 +35,9 @@ export const OrderEditPage = () => {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const ordersBackTo =
+    (location.state as { from?: string } | null)?.from ||
+    `/orders${location.search}`
 
   const filteredMenuItems = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase()
@@ -69,11 +71,9 @@ export const OrderEditPage = () => {
         }
 
         const { order: currentOrder, items } = await ordersApi.getOrderDetails(orderId)
-        const selectedTable = await getTableById(currentOrder.table_id)
         const menu = await getMenuItems()
 
         setOrder(currentOrder)
-        setTable(selectedTable)
         setMenuItems(menu)
         setOrderItems(
           items.flatMap((item) => {
@@ -160,7 +160,9 @@ export const OrderEditPage = () => {
 
       await saveOrderItems(order.id, orderItems)
       await updateOrderTotal(order.id, totalAmount)
-      navigate(`/orders/${order.id}`)
+      navigate(`/orders/${order.id}${location.search}`, {
+        state: { from: ordersBackTo },
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка сохранения заказа')
     } finally {
@@ -186,14 +188,10 @@ export const OrderEditPage = () => {
 
   return (
     <div className="container mx-auto p-4 pb-28 md:p-6 md:pb-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">
-          Редактирование заказа стола №{table?.number}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Измените позиции заказа и сохраните изменения.
-        </p>
-      </div>
+      <PageHeader
+        title="Редактирование заказа"
+        backTo={ordersBackTo}
+      />
 
       {error && (
         <div className="mb-4 text-sm text-red-500">

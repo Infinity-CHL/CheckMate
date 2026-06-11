@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/PageHeader'
 import { useTables } from '@/features/tables/hooks/useTables'
 import { TableGrid } from '@/features/tables/components/TableGrid'
 
@@ -22,12 +23,7 @@ export const TablesPage = () => {
 
   return (
     <div className="container mx-auto p-4 pb-6 md:p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Выбор стола</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Свободные и занятые столы доступны для перехода к заказу.
-        </p>
-      </div>
+      <PageHeader title="Столы" />
 
       <TableGrid tables={tables} />
     </div>

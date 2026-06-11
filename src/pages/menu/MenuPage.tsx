@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { PageHeader } from '@/components/PageHeader'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -75,12 +76,7 @@ export const MenuPage = () => {
 
   return (
     <div className="container mx-auto p-4 pb-6 md:p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Меню</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Активные позиции меню по категориям.
-        </p>
-      </div>
+      <PageHeader title="Меню" />
 
       <div className="grid grid-cols-3 gap-2 mb-6 sm:flex sm:flex-wrap">
         {categories.map((category) => (

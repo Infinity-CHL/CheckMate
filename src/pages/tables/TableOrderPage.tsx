@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -270,14 +271,10 @@ export const TableOrderPage = () => {
 
   return (
     <div className="container mx-auto p-4 pb-28 md:p-6 md:pb-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">
-          Заказ стола №{table?.number}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Выберите блюда из меню и сохраните заказ.
-        </p>
-      </div>
+      <PageHeader
+        title={`Заказ стола №${table?.number ?? '—'}`}
+        backTo="/orders"
+      />
 
       {error && (
         <div className="mb-4 text-sm text-red-500">

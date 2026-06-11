@@ -1,9 +1,13 @@
 import { Outlet, Link, NavLink } from 'react-router-dom'
+import Avatar from 'boring-avatars'
 import { BarChart3, ClipboardList, LayoutGrid, User, UtensilsCrossed } from 'lucide-react'
 import { useAuth } from '@/features/auth/useAuth'
 
+const avatarColors = ['#2f3a2f', '#7a4f2b', '#d8a15d', '#f2dfb3', '#9f5f36']
+
 export const RootLayout = () => {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
+  const avatarSeed = profile?.full_name || user?.email || user?.id || 'CheckMate'
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -48,12 +52,12 @@ export const RootLayout = () => {
         </div>
       </header>
 
-      <main className="flex-1 pb-20 md:pb-0">
+      <main className="flex-1 pb-24 md:pb-0">
         <Outlet />
       </main>
 
       {user && (
-        <nav className="fixed inset-x-0 bottom-0 z-50 border-t bg-background/95 px-2 py-2 shadow-lg backdrop-blur md:hidden">
+        <nav className="fixed inset-x-0 bottom-3 z-50 border-t bg-background/95 px-2 py-2 shadow-lg backdrop-blur md:hidden">
           <div className="grid grid-cols-4 gap-1">
             <NavLink
               to="/orders"
@@ -85,11 +89,26 @@ export const RootLayout = () => {
             <NavLink
               to="/profile"
               className={({ isActive }) =>
-                `flex min-h-14 flex-col items-center justify-center gap-1 px-2 text-xs font-medium ${isActive ? 'text-primary' : 'text-muted-foreground'}`
+                `flex min-h-14 flex-col items-center justify-center gap-1 px-2 py-0 text-xs font-medium ${isActive ? 'text-primary [&_.profile-avatar]:ring-2 [&_.profile-avatar]:ring-primary [&_.profile-avatar]:ring-offset-2 [&_.profile-avatar]:ring-offset-background' : 'text-muted-foreground'}`
               }
+              aria-label="Профиль"
             >
-              <User className="h-5 w-5" />
-              <span>Профиль</span>
+              <span className="profile-avatar flex h-9 w-9 items-center justify-center overflow-hidden rounded-full ring-1 ring-border">
+                {profile?.avatar_url ? (
+                  <img
+                    src={profile.avatar_url}
+                    alt="Профиль"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <Avatar
+                    name={avatarSeed}
+                    variant="beam"
+                    colors={avatarColors}
+                    size={36}
+                  />
+                )}
+              </span>
             </NavLink>
           </div>
         </nav>

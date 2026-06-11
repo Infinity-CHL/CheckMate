@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/PageHeader'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useDashboardStats } from '@/features/dashboard/hooks/useDashboardStats'
 
@@ -44,12 +45,7 @@ export const DashboardPage = () => {
 
   return (
     <div className="container mx-auto p-4">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Аналитика по закрытым заказам.
-        </p>
-      </div>
+      <PageHeader title="Аналитика" />
 
       {error && (
         <div className="mb-4 text-sm text-red-500">

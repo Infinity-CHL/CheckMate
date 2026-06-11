@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { ORDER_STATUS, type OrderStatus } from '@/entities/order/constants/order.constants'
 import { OrderFilters } from '@/features/orders/components/OrderFilters'
@@ -148,13 +149,15 @@ export const OrdersPage = () => {
 
   return (
     <div className="container mx-auto p-4 pb-6 md:p-6">
-      <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold">Заказы</h1>
-        <Button className="h-11 w-full sm:w-auto" onClick={() => navigate('/tables')}>
+      <PageHeader
+        title="Заказы"
+        actions={
+          <Button className="h-11 w-full sm:w-auto" onClick={() => navigate('/tables')}>
           <Plus className="mr-2 h-4 w-4" />
           Создать заказ
         </Button>
-      </div>
+        }
+      />
 
       <OrderFilters activeFilter={filter} onFilterChange={handleFilterChange} />
       <OrderList orders={filteredOrders} />
