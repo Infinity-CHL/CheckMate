@@ -1,19 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Trash2 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import type { MenuItem } from '@/entities/menu/model/menu-item.model'
 import { TABLE_STATUS } from '@/entities/table/constants/table.constants'
 import type { RestaurantTable } from '@/entities/table/model/table.model'
@@ -27,6 +17,7 @@ import {
   type LocalOrderItem,
   type TableOrder,
 } from '@/features/table-order/api/tableOrderApi'
+import { OrderReceiptItems } from '@/features/table-order/components/OrderReceiptItems'
 import { getTableById, updateTableStatus } from '@/features/tables/api/tablesApi'
 import { useAuth } from '@/features/auth/useAuth'
 import {
@@ -350,86 +341,22 @@ export const TableOrderPage = () => {
             <CardTitle>Состав заказа</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {orderItems.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">Позиции не добавлены</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table className="min-w-[680px]">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Название</TableHead>
-                    <TableHead>Цена</TableHead>
-                    <TableHead>Кол-во</TableHead>
-                    <TableHead>Сумма</TableHead>
-                    <TableHead className="w-[48px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {orderItems.map((item) => (
-                    <TableRow key={item.menuItem.id}>
-                      <TableCell>
-                        <div className="space-y-2">
-                          <div>{item.menuItem.name}</div>
-                          <Textarea
-                            placeholder="Комментарий к позиции"
-                            value={item.note ?? ''}
-                            onChange={(event) =>
-                              handleNoteChange(item.menuItem.id, event.target.value)
-                            }
-                          />
-                        </div>
-                      </TableCell>
-                      <TableCell>{item.price} ₽</TableCell>
-                      <TableCell>
-                        <Input
-                          min={0}
-                          type="number"
-                          value={item.quantity}
-                          className="w-16"
-                          onChange={(event) =>
-                            handleQuantityChange(
-                              item.menuItem.id,
-                              Number(event.target.value)
-                            )
-                          }
-                        />
-                      </TableCell>
-                      <TableCell>
-                        {item.price * item.quantity} ₽
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveItem(item.menuItem.id)}
-                          aria-label={`Удалить ${item.menuItem.name}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-                </Table>
-              </div>
-            )}
+            <OrderReceiptItems
+              items={orderItems}
+              totalAmount={totalAmount}
+              onQuantityChange={handleQuantityChange}
+              onNoteChange={handleNoteChange}
+              onRemoveItem={handleRemoveItem}
+            />
 
             <div className="sticky bottom-20 -mx-6 space-y-3 border-t bg-background p-4 md:static md:mx-0 md:border-t-0 md:p-0">
-            <div className="flex items-center justify-between">
-              <span className="font-medium">Итого</span>
-              <span className="text-lg font-bold">{totalAmount} ₽</span>
-            </div>
-
-            <Button
-              className="h-11 w-full"
-              onClick={() => setShowSaveConfirmation(true)}
-              disabled={saving || orderItems.length === 0}
-            >
-              {saving ? 'Сохранение...' : 'Сохранить заказ'}
-            </Button>
+              <Button
+                className="h-11 w-full"
+                onClick={() => setShowSaveConfirmation(true)}
+                disabled={saving || orderItems.length === 0}
+              >
+                {saving ? 'Сохранение...' : 'Сохранить заказ'}
+              </Button>
             </div>
           </CardContent>
         </Card>
