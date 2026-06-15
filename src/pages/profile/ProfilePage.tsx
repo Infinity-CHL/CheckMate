@@ -349,7 +349,7 @@ export const ProfilePage = () => {
       <PageHeader title="Профиль" />
 
       <div className="mx-auto grid max-w-2xl gap-4">
-        <Card>
+        <Card className="bg-white/80">
           <CardHeader>
             <CardTitle className="text-lg">Сотрудник</CardTitle>
           </CardHeader>
@@ -424,7 +424,7 @@ export const ProfilePage = () => {
 
                 <div className="space-y-2">
                   <Label>Почта</Label>
-                  <p className="min-h-11 border border-input px-2.5 py-3 text-sm text-muted-foreground">
+                  <p className="min-h-11 rounded-xl border border-input/80 bg-background/70 px-2.5 py-3 text-sm text-muted-foreground shadow-sm">
                     {email}
                   </p>
                 </div>

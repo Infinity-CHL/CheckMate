@@ -51,7 +51,10 @@ export const OrderCard = ({ order }: OrderCardProps) => {
   }
 
   return (
-    <Card className="min-h-32 hover:shadow-lg transition-shadow cursor-pointer" onClick={handleClick}>
+    <Card
+      className="min-h-32 cursor-pointer border-white/70 bg-white/80 transition-all hover:-translate-y-0.5 hover:shadow-md"
+      onClick={handleClick}
+    >
       <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-3">
         <CardTitle className="text-lg">
           Стол №{order.table?.number ?? '—'}
@@ -72,7 +75,7 @@ export const OrderCard = ({ order }: OrderCardProps) => {
           </div>
           <div className="text-right">
             <p className="text-lg font-bold">{order.total_amount} ₽</p>
-            <Button variant="ghost" size="sm" className="mt-1 h-10">
+            <Button variant="ghost" size="sm" className="mt-1 h-8">
               Подробнее →
             </Button>
           </div>

@@ -1,4 +1,5 @@
 import { PageHeader } from '@/components/PageHeader'
+import { AppLoader } from '@/components/AppLoader'
 import { useTables } from '@/features/tables/hooks/useTables'
 import { TableGrid } from '@/features/tables/components/TableGrid'
 
@@ -6,11 +7,7 @@ export const TablesPage = () => {
   const { tables, loading, error } = useTables()
 
   if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-      </div>
-    )
+    return <AppLoader />
   }
 
   if (error) {

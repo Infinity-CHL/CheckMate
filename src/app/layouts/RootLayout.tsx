@@ -10,8 +10,8 @@ export const RootLayout = () => {
   const avatarSeed = profile?.full_name || user?.email || user?.id || 'CheckMate'
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="border-b">
+    <div className="flex min-h-screen flex-col">
+      <header className="sticky top-0 z-40 border-b border-white/60 bg-background/75 backdrop-blur-xl">
         <div className="container mx-auto px-4 py-3 flex justify-between items-center">
           <Link to="/" className="text-xl font-bold">
             CheckMate
@@ -57,12 +57,12 @@ export const RootLayout = () => {
       </main>
 
       {user && (
-        <nav className="fixed inset-x-0 bottom-3 z-50 border-t bg-background/95 px-2 py-2 shadow-lg backdrop-blur md:hidden">
+        <nav className="fixed inset-x-3 bottom-3 z-50 rounded-3xl border border-white/70 bg-background/80 px-2 py-2 shadow-lg backdrop-blur-xl md:hidden">
           <div className="grid grid-cols-4 gap-1">
             <NavLink
               to="/orders"
               className={({ isActive }) =>
-                `flex min-h-14 flex-col items-center justify-center gap-1 px-2 text-xs font-medium ${isActive ? 'text-primary' : 'text-muted-foreground'}`
+                `flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl px-2 text-xs font-medium transition-colors ${isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground'}`
               }
             >
               <ClipboardList className="h-5 w-5" />
@@ -71,7 +71,7 @@ export const RootLayout = () => {
             <NavLink
               to="/tables"
               className={({ isActive }) =>
-                `flex min-h-14 flex-col items-center justify-center gap-1 px-2 text-xs font-medium ${isActive ? 'text-primary' : 'text-muted-foreground'}`
+                `flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl px-2 text-xs font-medium transition-colors ${isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground'}`
               }
             >
               <LayoutGrid className="h-5 w-5" />
@@ -80,7 +80,7 @@ export const RootLayout = () => {
             <NavLink
               to="/dashboard"
               className={({ isActive }) =>
-                `flex min-h-14 flex-col items-center justify-center gap-1 px-2 text-xs font-medium ${isActive ? 'text-primary' : 'text-muted-foreground'}`
+                `flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl px-2 text-xs font-medium transition-colors ${isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground'}`
               }
             >
               <BarChart3 className="h-5 w-5" />
@@ -89,7 +89,7 @@ export const RootLayout = () => {
             <NavLink
               to="/profile"
               className={({ isActive }) =>
-                `flex min-h-14 flex-col items-center justify-center gap-1 px-2 py-0 text-xs font-medium ${isActive ? 'text-primary [&_.profile-avatar]:ring-2 [&_.profile-avatar]:ring-primary [&_.profile-avatar]:ring-offset-2 [&_.profile-avatar]:ring-offset-background' : 'text-muted-foreground'}`
+                `flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl px-2 py-0 text-xs font-medium transition-colors ${isActive ? 'bg-primary/10 text-primary [&_.profile-avatar]:ring-2 [&_.profile-avatar]:ring-primary [&_.profile-avatar]:ring-offset-2 [&_.profile-avatar]:ring-offset-background' : 'text-muted-foreground'}`
               }
               aria-label="Профиль"
             >

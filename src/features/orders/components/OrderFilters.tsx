@@ -14,13 +14,13 @@ const filters: Array<{ value: 'all' | OrderStatus; label: string }> = [
 
 export const OrderFilters = ({ activeFilter, onFilterChange }: OrderFiltersProps) => {
   return (
-    <div className="grid grid-cols-3 gap-2 mb-6 sm:flex sm:flex-wrap">
+    <div className="mb-6 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
       {filters.map((filter) => (
         <Button
           key={filter.value}
           variant={activeFilter === filter.value ? 'default' : 'outline'}
           onClick={() => onFilterChange(filter.value)}
-          className="h-11"
+          className="h-9"
         >
           {filter.label}
         </Button>

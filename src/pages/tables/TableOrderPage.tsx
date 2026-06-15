@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { PageHeader } from '@/components/PageHeader'
+import { AppLoader } from '@/components/AppLoader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -245,11 +246,7 @@ export const TableOrderPage = () => {
   }
 
   if (loading || isAuthLoading) {
-    return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-      </div>
-    )
+    return <AppLoader />
   }
 
   if (error && !table) {
@@ -273,28 +270,28 @@ export const TableOrderPage = () => {
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_420px]">
-        <Card>
+      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle>Меню</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <Input
-              className="h-11"
+              className="h-9"
               placeholder="Поиск блюда"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
 
-            {search.trim() ? (
-              <div className="max-h-[60vh] overflow-y-auto border bg-background">
+            {search.trim() && (
+              <div className="max-h-[48vh] overflow-y-auto rounded-2xl border border-border/80 bg-background/70 shadow-sm">
                 {filteredMenuItems.length > 0 ? (
                   filteredMenuItems.map((item) => (
                     <div
                       key={item.id}
                       role="button"
                       tabIndex={0}
-                      className="flex min-h-16 cursor-pointer items-center justify-between gap-3 border-b p-3 last:border-b-0 hover:bg-muted"
+                      className="flex min-h-12 cursor-pointer items-center justify-between gap-2 border-b border-border/70 px-3 py-2 last:border-b-0 hover:bg-muted/70"
                       onClick={() => handleAddItem(item)}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter') {
@@ -302,16 +299,16 @@ export const TableOrderPage = () => {
                         }
                       }}
                     >
-                      <div>
-                        <div className="font-medium">{item.name}</div>
-                        <div className="mt-1 text-sm text-muted-foreground">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium">{item.name}</div>
+                        <div className="mt-0.5 text-xs text-muted-foreground">
                           {item.price} ₽
                         </div>
                       </div>
                       <Button
                         type="button"
                         size="icon-sm"
-                        className="h-10 w-10"
+                        className="h-8 w-8"
                         onClick={(event) => {
                           event.stopPropagation()
                           handleAddItem(item)
@@ -328,15 +325,11 @@ export const TableOrderPage = () => {
                   </div>
                 )}
               </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">Начните вводить название блюда</p>
-              </div>
             )}
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle>Состав заказа</CardTitle>
           </CardHeader>
@@ -349,7 +342,7 @@ export const TableOrderPage = () => {
               onRemoveItem={handleRemoveItem}
             />
 
-            <div className="sticky bottom-20 -mx-6 space-y-3 border-t bg-background p-4 md:static md:mx-0 md:border-t-0 md:p-0">
+            <div className="sticky bottom-20 -mx-4 space-y-3 border-t bg-background p-4 md:static md:mx-0 md:border-t-0 md:p-0">
               <Button
                 className="h-11 w-full"
                 onClick={() => setShowSaveConfirmation(true)}

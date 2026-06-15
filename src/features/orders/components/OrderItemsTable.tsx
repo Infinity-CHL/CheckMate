@@ -1,6 +1,7 @@
-import { Button } from '@/components/ui/button'
+import { Trash2 } from 'lucide-react'
+
 import { Badge } from '@/components/ui/badge'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Button } from '@/components/ui/button'
 import {
   ORDER_ITEM_STATUS,
   ORDER_ITEM_STATUS_LABELS,
@@ -8,7 +9,6 @@ import {
   type OrderItemStatus,
 } from '@/entities/order/constants/order-item.constants'
 import type { OrderItem } from '@/entities/order/model/order.model'
-import { Trash2 } from 'lucide-react'
 
 interface OrderItemsTableProps {
   items: OrderItem[]
@@ -17,6 +17,11 @@ interface OrderItemsTableProps {
   isReadOnly?: boolean
   isAdmin?: boolean
 }
+
+const formatAmount = (value: number) =>
+  new Intl.NumberFormat('ru-RU', {
+    maximumFractionDigits: 0,
+  }).format(value)
 
 export const OrderItemsTable = ({
   items,
@@ -27,92 +32,86 @@ export const OrderItemsTable = ({
 }: OrderItemsTableProps) => {
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
 
-  return (
-    <div className="overflow-x-auto rounded-md border">
-      <Table className="min-w-[680px]">
-        <TableHeader>
-          <TableRow>
-            <TableHead>Товар</TableHead>
-            <TableHead className="text-center">Кол-во</TableHead>
-            <TableHead className="text-right">Цена</TableHead>
-            <TableHead className="text-right">Сумма</TableHead>
-            <TableHead>Статус</TableHead>
-            {isAdmin && <TableHead className="w-[50px]"></TableHead>}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {items.map((item) => {
-            const status = normalizeOrderItemStatus(item.status)
+  if (items.length === 0) {
+    return (
+      <div className="rounded-3xl border border-dashed border-border/80 bg-background/70 px-3 py-8 text-center">
+        <p className="text-muted-foreground">Позиции не добавлены</p>
+      </div>
+    )
+  }
 
-            return (
-              <TableRow key={item.id}>
-                <TableCell className="font-medium">
-                  <div>
-                    <div>
-                      {item.menu_item?.name || 'Товар'}
-                      {item.menu_item?.category && (
-                        <span className="text-xs text-muted-foreground ml-2">
-                          ({item.menu_item.category})
-                        </span>
-                      )}
-                    </div>
-                    {item.note?.trim() && (
-                      <p className="mt-1 text-xs font-normal text-muted-foreground">
-                        Комментарий: {item.note}
-                      </p>
-                    )}
+  return (
+    <div className="w-full min-w-0 overflow-hidden rounded-3xl border border-dashed border-border/80 bg-background/70 shadow-sm">
+      <div className="divide-y divide-dashed divide-border/80">
+        {items.map((item) => {
+          const status = normalizeOrderItemStatus(item.status)
+          const itemTotal = item.price * item.quantity
+
+          return (
+            <div key={item.id} className="min-w-0 space-y-2.5 p-3">
+              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-baseline gap-2">
+                <div className="min-w-0 truncate text-sm font-medium leading-snug">
+                  {item.menu_item?.name || 'Товар'}
+                </div>
+                <div className="shrink-0 whitespace-nowrap text-xs text-muted-foreground tabular-nums">
+                  ×{item.quantity}
+                </div>
+                <div className="shrink-0 whitespace-nowrap text-right text-sm font-semibold tabular-nums">
+                  {formatAmount(itemTotal)} ₽
+                </div>
+              </div>
+
+              {item.note?.trim() && (
+                <p className="min-w-0 break-words text-xs leading-snug text-muted-foreground">
+                  {item.note}
+                </p>
+              )}
+
+              <div className="flex min-w-0 items-center justify-between gap-2">
+                {isReadOnly || !onUpdateItemStatus ? (
+                  <Badge variant="outline">{ORDER_ITEM_STATUS_LABELS[status]}</Badge>
+                ) : (
+                  <div className="flex min-w-0 flex-wrap gap-1.5">
+                    {Object.values(ORDER_ITEM_STATUS).map((nextStatus) => (
+                      <Button
+                        key={nextStatus}
+                        type="button"
+                        size="xs"
+                        variant={status === nextStatus ? 'default' : 'outline'}
+                        onClick={() => onUpdateItemStatus(item.id, nextStatus)}
+                        disabled={status === nextStatus}
+                      >
+                        {ORDER_ITEM_STATUS_LABELS[nextStatus]}
+                      </Button>
+                    ))}
                   </div>
-                </TableCell>
-                <TableCell className="text-center">{item.quantity}</TableCell>
-                <TableCell className="text-right">{item.price} ₽</TableCell>
-                <TableCell className="text-right font-medium">
-                  {item.price * item.quantity} ₽
-                </TableCell>
-                <TableCell>
-                  {isReadOnly || !onUpdateItemStatus ? (
-                    <Badge variant="outline">
-                      {ORDER_ITEM_STATUS_LABELS[status]}
-                    </Badge>
-                  ) : (
-                    <div className="flex flex-col gap-2 sm:flex-row">
-                      {Object.values(ORDER_ITEM_STATUS).map((nextStatus) => (
-                        <Button
-                          key={nextStatus}
-                          type="button"
-                          size="sm"
-                          variant={status === nextStatus ? 'default' : 'outline'}
-                          onClick={() => onUpdateItemStatus(item.id, nextStatus)}
-                          disabled={status === nextStatus}
-                        >
-                          {ORDER_ITEM_STATUS_LABELS[nextStatus]}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
-                </TableCell>
-                {isAdmin && (
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => onRemoveItem?.(item.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
                 )}
-              </TableRow>
-            )
-          })}
-          <TableRow className="bg-muted/50">
-            <TableCell colSpan={4} className="text-right font-bold">
-              Итого:
-            </TableCell>
-            <TableCell className="text-right font-bold">{total} ₽</TableCell>
-            {isAdmin && <TableCell />}
-          </TableRow>
-        </TableBody>
-      </Table>
+
+                {isAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                    onClick={() => onRemoveItem?.(item.id)}
+                    aria-label={`Удалить ${item.menu_item?.name || 'позицию'}`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="border-t border-dashed border-border/80 bg-white/60 p-3">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 text-sm font-semibold">
+          <span>Итого:</span>
+          <span className="whitespace-nowrap text-right tabular-nums">
+            {formatAmount(total)} ₽
+          </span>
+        </div>
+      </div>
     </div>
   )
 }

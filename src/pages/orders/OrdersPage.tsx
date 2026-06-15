@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { PageHeader } from '@/components/PageHeader'
+import { AppLoader } from '@/components/AppLoader'
 import { Button } from '@/components/ui/button'
 import { ORDER_STATUS, type OrderStatus } from '@/entities/order/constants/order.constants'
 import { OrderFilters } from '@/features/orders/components/OrderFilters'
@@ -132,11 +133,7 @@ export const OrdersPage = () => {
   }
 
   if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-      </div>
-    )
+    return <AppLoader />
   }
 
   if (error) {
