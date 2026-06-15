@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useLocation, useParams, useNavigate } from 'react-router-dom'
 import { PageHeader } from '@/components/PageHeader'
+import { AppLoader } from '@/components/AppLoader'
 import { useOrderDetails } from '@/features/orders/hooks/useOrderDetails'
 import { OrderItemsTable } from '@/features/orders/components/OrderItemsTable'
 import { OrderStatusBadge } from '@/features/orders/components/OrderStatusBadge'
@@ -59,11 +60,7 @@ export const OrderDetailsPage = () => {
   }
 
   if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-      </div>
-    )
+    return <AppLoader />
   }
 
   if (error || !order) {

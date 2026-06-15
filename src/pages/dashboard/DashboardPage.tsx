@@ -1,4 +1,5 @@
 import { PageHeader } from '@/components/PageHeader'
+import { AppLoader } from '@/components/AppLoader'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useDashboardStats } from '@/features/dashboard/hooks/useDashboardStats'
 
@@ -20,7 +21,7 @@ type StatCardProps = {
 }
 
 const StatCard = ({ title, value }: StatCardProps) => (
-  <Card>
+  <Card className="bg-white/80">
     <CardHeader className="pb-2">
       <CardTitle className="text-sm font-medium text-muted-foreground">
         {title}
@@ -36,15 +37,11 @@ export const DashboardPage = () => {
   const { stats, loading, error } = useDashboardStats()
 
   if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-      </div>
-    )
+    return <AppLoader />
   }
 
   return (
-    <div className="container mx-auto p-4">
+    <div className="container mx-auto p-4 md:p-6">
       <PageHeader title="Аналитика" />
 
       {error && (

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
+import { AppLoader } from '@/components/AppLoader'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -59,11 +60,7 @@ export const MenuPage = () => {
   }, [])
 
   if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-      </div>
-    )
+    return <AppLoader />
   }
 
   if (error) {
@@ -78,11 +75,11 @@ export const MenuPage = () => {
     <div className="container mx-auto p-4 pb-6 md:p-6">
       <PageHeader title="Меню" />
 
-      <div className="grid grid-cols-3 gap-2 mb-6 sm:flex sm:flex-wrap">
+      <div className="mb-6 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
         {categories.map((category) => (
           <Button
             key={category.value}
-            className="h-11"
+            className="h-9"
             variant={activeCategory === category.value ? 'default' : 'outline'}
             onClick={() => setActiveCategory(category.value)}
           >
@@ -103,7 +100,7 @@ export const MenuPage = () => {
             const category = isMenuCategory(item.category) ? item.category : activeCategory
 
             return (
-              <Card key={item.id} className="min-h-32">
+              <Card key={item.id} className="min-h-32 bg-white/80">
                 <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-3">
                   <CardTitle className="text-lg">{item.name}</CardTitle>
                   <Badge variant="outline">{categoryLabels[category]}</Badge>

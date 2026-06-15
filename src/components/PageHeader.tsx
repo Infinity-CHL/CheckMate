@@ -24,13 +24,13 @@ export const PageHeader = ({
   }
 
   return (
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-white/60 bg-white/45 px-3 py-2 shadow-sm backdrop-blur">
       <div className="flex min-h-11 items-center gap-3">
         {backTo && (
           <Button
             type="button"
             variant="ghost"
-            className="h-10 px-2 text-sm font-medium"
+            className="h-9 px-2 text-sm font-medium"
             onClick={handleBack}
           >
             <ArrowLeft className="mr-1 h-4 w-4" />

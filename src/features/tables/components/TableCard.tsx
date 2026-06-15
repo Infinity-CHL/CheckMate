@@ -23,7 +23,7 @@ export const TableCard = ({ table }: TableCardProps) => {
   return (
     <Card
       className={cn(
-        'min-h-32 border p-0 transition-colors',
+        'min-h-32 border-white/70 p-0 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md',
         TABLE_CARD_COLORS[table.status],
         isClickable ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'
       )}
