@@ -1,4 +1,4 @@
-import { Outlet, Link, NavLink } from 'react-router-dom'
+import { Outlet, Link, NavLink, useLocation } from 'react-router-dom'
 import Avatar from 'boring-avatars'
 import { BarChart3, ClipboardList, LayoutGrid, User, UtensilsCrossed } from 'lucide-react'
 import { useAuth } from '@/features/auth/useAuth'
@@ -7,11 +7,13 @@ const avatarColors = ['#2f3a2f', '#7a4f2b', '#d8a15d', '#f2dfb3', '#9f5f36']
 
 export const RootLayout = () => {
   const { user, profile } = useAuth()
+  const location = useLocation()
   const avatarSeed = profile?.full_name || user?.email || user?.id || 'CheckMate'
+  const isAuthPage = location.pathname === '/login' || location.pathname === '/signup'
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-40 border-b border-white/60 bg-background/75 backdrop-blur-xl">
+      {!isAuthPage && <header className="sticky top-0 z-40 border-b border-white/60 bg-background/75 backdrop-blur-xl">
         <div className="container mx-auto px-4 py-3 flex justify-between items-center">
           <Link to="/" className="text-xl font-bold">
             CheckMate
@@ -50,13 +52,13 @@ export const RootLayout = () => {
             )}
           </nav>
         </div>
-      </header>
+      </header>}
 
-      <main className="flex-1 pb-24 md:pb-0">
+      <main className={isAuthPage ? 'flex-1' : 'flex-1 pb-24 md:pb-0'}>
         <Outlet />
       </main>
 
-      {user && (
+      {user && !isAuthPage && (
         <nav className="fixed inset-x-3 bottom-3 z-50 rounded-3xl border border-white/70 bg-background/80 px-2 py-2 shadow-lg backdrop-blur-xl md:hidden">
           <div className="grid grid-cols-4 gap-1">
             <NavLink
@@ -114,11 +116,11 @@ export const RootLayout = () => {
         </nav>
       )}
 
-      <footer className="hidden border-t py-4 text-center text-sm text-muted-foreground md:block">
+      {!isAuthPage && <footer className="hidden border-t py-4 text-center text-sm text-muted-foreground md:block">
         <div className="container mx-auto">
           CheckMate © {new Date().getFullYear()}
         </div>
-      </footer>
+      </footer>}
     </div>
   )
 }

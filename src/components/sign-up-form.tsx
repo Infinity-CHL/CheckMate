@@ -1,8 +1,6 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'  // ← добавить
+import { Link, useNavigate } from 'react-router-dom'
 
-import { cn } from '@/lib/utils'
-import { supabase } from '@/shared/api/supabase'  // ← изменить импорт
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -13,28 +11,54 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils'
+import { supabase } from '@/shared/api/supabase'
 
-export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutRef<'div'>) {
+const getSignUpErrorMessage = (message: string) => {
+  const normalizedMessage = message.toLowerCase()
+
+  if (
+    normalizedMessage.includes('already registered') ||
+    normalizedMessage.includes('already exists') ||
+    normalizedMessage.includes('user already')
+  ) {
+    return 'Аккаунт с такой почтой уже существует'
+  }
+
+  if (normalizedMessage.includes('invalid email')) {
+    return 'Введите корректную почту'
+  }
+
+  if (normalizedMessage.includes('password')) {
+    return 'Пароль должен быть не короче 6 символов'
+  }
+
+  return 'Не удалось зарегистрироваться. Попробуйте ещё раз'
+}
+
+export function SignUpForm({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<'div'>) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [repeatPassword, setRepeatPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [success, setSuccess] = useState(false)
-  const navigate = useNavigate()  // ← добавить для редиректа
+  const navigate = useNavigate()
 
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSignUp = async (event: React.FormEvent) => {
+    event.preventDefault()
     setError(null)
 
-    // Валидация паролей
     if (password !== repeatPassword) {
-      setError('Passwords do not match')
+      setError('Пароли не совпадают')
       return
     }
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters')
+      setError('Пароль должен быть не короче 6 символов')
       return
     }
 
@@ -45,105 +69,110 @@ export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutR
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`, // ← опционально
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       })
-      
+
       if (error) throw error
-      
-      // Если пользователь создан, но email не требует подтверждения
+
       if (data.user?.identities?.length === 0) {
-        setError('User already exists. Please login instead.')
+        setError('Аккаунт с такой почтой уже существует')
       } else {
         setSuccess(true)
-        // Опционально: автоматически перенаправить на логин через 3 секунды
         setTimeout(() => {
           navigate('/login')
         }, 3000)
       }
     } catch (error: unknown) {
       console.error('Signup error:', error)
-      setError(error instanceof Error ? error.message : 'An error occurred')
+      setError(
+        error instanceof Error
+          ? getSignUpErrorMessage(error.message)
+          : 'Не удалось зарегистрироваться. Попробуйте ещё раз'
+      )
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <div className={cn('flex flex-col gap-6', className)} {...props}>
+    <div className={cn('flex flex-col gap-4', className)} {...props}>
       {success ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl">Thank you for signing up!</CardTitle>
-            <CardDescription>Check your email to confirm</CardDescription>
+        <Card className="bg-white/80">
+          <CardHeader className="gap-1 pb-2 text-center">
+            <CardTitle className="text-xl">Проверьте почту</CardTitle>
+            <CardDescription>Мы отправили письмо для подтверждения</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              You&apos;ve successfully signed up. Please check your email to confirm your account
-              before signing in.
+            <p className="mb-4 text-center text-sm text-muted-foreground">
+              Подтвердите аккаунт по ссылке из письма, затем войдите в CheckMate.
             </p>
-            <Button onClick={() => navigate('/login')} className="w-full">
-              Go to Login
+            <Button onClick={() => navigate('/login')} className="h-10 w-full">
+              Войти
             </Button>
           </CardContent>
         </Card>
       ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl">Sign up</CardTitle>
-            <CardDescription>Create a new account</CardDescription>
+        <Card className="bg-white/80">
+          <CardHeader className="gap-1 pb-2 text-center">
+            <CardTitle className="text-xl">Регистрация</CardTitle>
+            <CardDescription>Создайте аккаунт сотрудника</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSignUp}>
-              <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">Почта</Label>
                   <Input
                     id="email"
                     type="email"
-                    placeholder="m@example.com"
+                    placeholder="name@example.com"
+                    autoComplete="email"
                     required
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(event) => setEmail(event.target.value)}
                   />
                 </div>
+
                 <div className="grid gap-2">
-                  <div className="flex items-center">
-                    <Label htmlFor="password">Password</Label>
-                  </div>
+                  <Label htmlFor="password">Пароль</Label>
                   <Input
                     id="password"
                     type="password"
+                    autoComplete="new-password"
                     required
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(event) => setPassword(event.target.value)}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Password must be at least 6 characters
+                    Минимум 6 символов
                   </p>
                 </div>
+
                 <div className="grid gap-2">
-                  <div className="flex items-center">
-                    <Label htmlFor="repeat-password">Repeat Password</Label>
-                  </div>
+                  <Label htmlFor="repeat-password">Повторите пароль</Label>
                   <Input
                     id="repeat-password"
                     type="password"
+                    autoComplete="new-password"
                     required
                     value={repeatPassword}
-                    onChange={(e) => setRepeatPassword(e.target.value)}
+                    onChange={(event) => setRepeatPassword(event.target.value)}
                   />
                 </div>
+
                 {error && <p className="text-sm text-red-500">{error}</p>}
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? 'Creating an account...' : 'Sign up'}
+
+                <Button type="submit" className="h-10 w-full" disabled={isLoading}>
+                  {isLoading ? 'Создаём аккаунт...' : 'Зарегистрироваться'}
                 </Button>
               </div>
-              <div className="mt-4 text-center text-sm">
-                Already have an account?{' '}
-                <a href="/login" className="underline underline-offset-4">
-                  Login
-                </a>
+
+              <div className="mt-4 text-center text-sm text-muted-foreground">
+                Уже есть аккаунт?{' '}
+                <Link to="/login" className="font-medium text-foreground underline underline-offset-4">
+                  Войти
+                </Link>
               </div>
             </form>
           </CardContent>
