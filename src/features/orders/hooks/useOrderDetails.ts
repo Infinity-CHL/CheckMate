@@ -64,6 +64,18 @@ export const useOrderDetails = (orderId: string | undefined) => {
     }
   }, [orderId, fetchOrderDetails])
 
+  const updateTips = useCallback(async (tipsAmount: number) => {
+    if (!orderId) return
+
+    try {
+      await ordersApi.updateOrderTips(orderId, tipsAmount)
+      await fetchOrderDetails()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка сохранения чаевых')
+      throw err
+    }
+  }, [orderId, fetchOrderDetails])
+
   const closeOrder = useCallback(async () => {
     if (!orderId) return
 
@@ -123,5 +135,5 @@ export const useOrderDetails = (orderId: string | undefined) => {
     }
   }, [order?.table_id, orderId])
 
-  return { order, items, loading, error, updateStatus, closeOrder, addItem, removeItem, updateItemStatus, deleteOrder, refetch: fetchOrderDetails }
+  return { order, items, loading, error, updateStatus, updateTips, closeOrder, addItem, removeItem, updateItemStatus, deleteOrder, refetch: fetchOrderDetails }
 }

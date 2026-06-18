@@ -175,7 +175,7 @@ export const OrderEditPage = () => {
   }
 
   return (
-    <div className="container mx-auto p-4 pb-28 md:p-6 md:pb-6">
+    <div className="container mx-auto max-w-5xl p-3 pb-44 md:p-6 md:pb-8">
       <PageHeader
         title="Редактирование заказа"
         backTo={ordersBackTo}
@@ -187,14 +187,14 @@ export const OrderEditPage = () => {
         </div>
       )}
 
-      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
-        <Card className="min-w-0">
-          <CardHeader>
-            <CardTitle>Меню</CardTitle>
+      <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
+        <Card size="sm" className="min-w-0 gap-2 overflow-visible">
+          <CardHeader className="px-3">
+            <CardTitle className="text-xs">Меню</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-2 px-3">
             <Input
-              className="h-9"
+              className="h-8"
               placeholder="Поиск блюда"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
@@ -246,11 +246,11 @@ export const OrderEditPage = () => {
           </CardContent>
         </Card>
 
-        <Card className="min-w-0">
-          <CardHeader>
-            <CardTitle>Состав заказа</CardTitle>
+        <Card size="sm" className="min-w-0 gap-2 overflow-visible">
+          <CardHeader className="px-3">
+            <CardTitle className="text-xs">Состав заказа</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-2 px-3">
             <OrderReceiptItems
               items={orderItems}
               totalAmount={totalAmount}
@@ -258,18 +258,20 @@ export const OrderEditPage = () => {
               onNoteChange={handleNoteChange}
               onRemoveItem={handleRemoveItem}
             />
-
-            <div className="space-y-3 border-t bg-background md:static md:mx-0 md:border-t-0 md:p-0">
-              <Button
-                className="h-11 w-full"
-                onClick={handleSaveOrder}
-                disabled={saving}
-              >
-                {saving ? 'Сохранение...' : 'Сохранить изменения'}
-              </Button>
-            </div>
           </CardContent>
         </Card>
+      </div>
+
+      <div className="fixed inset-x-3 bottom-24 z-40 md:sticky md:bottom-4 md:inset-x-auto md:mx-auto md:mt-4 md:max-w-md">
+        <div className="rounded-3xl border border-white/70 bg-background/85 p-2 shadow-lg backdrop-blur-xl">
+          <Button
+            className="h-11 w-full rounded-2xl"
+            onClick={handleSaveOrder}
+            disabled={saving}
+          >
+            {saving ? 'Сохранение...' : 'Сохранить изменения'}
+          </Button>
+        </div>
       </div>
     </div>
   )

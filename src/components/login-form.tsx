@@ -1,8 +1,6 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'  // ← добавить
+import { Link, useNavigate } from 'react-router-dom'
 
-import { cn } from '@/lib/utils'
-import { supabase } from '@/shared/api/supabase'  // ← изменить импорт
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -13,16 +11,35 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils'
+import { supabase } from '@/shared/api/supabase'
 
-export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRef<'div'>) {
+const getLoginErrorMessage = (message: string) => {
+  const normalizedMessage = message.toLowerCase()
+
+  if (normalizedMessage.includes('invalid login credentials')) {
+    return 'Неверная почта или пароль'
+  }
+
+  if (normalizedMessage.includes('email not confirmed')) {
+    return 'Подтвердите почту перед входом'
+  }
+
+  return 'Не удалось войти. Проверьте данные и попробуйте ещё раз'
+}
+
+export function LoginForm({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<'div'>) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const navigate = useNavigate()  // ← добавить для навигации
+  const navigate = useNavigate()
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleLogin = async (event: React.FormEvent) => {
+    event.preventDefault()
     setIsLoading(true)
     setError(null)
 
@@ -34,66 +51,66 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
 
       if (error) throw error
 
-      // ✅ Правильный редирект через React Router
-      navigate('/')  // или location.href = '/' - оба работают
-
+      navigate('/')
     } catch (error: unknown) {
       console.error('Login error:', error)
-      setError(error instanceof Error ? error.message : 'An error occurred')
+      setError(
+        error instanceof Error
+          ? getLoginErrorMessage(error.message)
+          : 'Не удалось войти. Попробуйте ещё раз'
+      )
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <div className={cn('flex flex-col gap-6', className)} {...props}>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">Login</CardTitle>
-          <CardDescription>Enter your email below to login to your account</CardDescription>
+    <div className={cn('flex flex-col gap-4', className)} {...props}>
+      <Card className="bg-white/80">
+        <CardHeader className="gap-1 pb-2 text-center">
+          <CardTitle className="text-xl">Войти</CardTitle>
+          <CardDescription>Введите почту и пароль официанта</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin}>
-            <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Почта</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="m@example.com"
+                  placeholder="name@example.com"
+                  autoComplete="email"
                   required
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(event) => setEmail(event.target.value)}
                 />
               </div>
+
               <div className="grid gap-2">
-                <div className="flex items-center">
-                  <Label htmlFor="password">Password</Label>
-                  <a
-                    href="/forgot-password"
-                    className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
-                  >
-                    Forgot your password?
-                  </a>
-                </div>
+                <Label htmlFor="password">Пароль</Label>
                 <Input
                   id="password"
                   type="password"
+                  autoComplete="current-password"
                   required
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(event) => setPassword(event.target.value)}
                 />
               </div>
+
               {error && <p className="text-sm text-red-500">{error}</p>}
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? 'Logging in...' : 'Login'}
+
+              <Button type="submit" className="h-10 w-full" disabled={isLoading}>
+                {isLoading ? 'Входим...' : 'Войти'}
               </Button>
             </div>
-            <div className="mt-4 text-center text-sm">
-              Don&apos;t have an account?{' '}
-              <a href="/signup" className="underline underline-offset-4">
-                Sign up
-              </a>
+
+            <div className="mt-4 text-center text-sm text-muted-foreground">
+              Нет аккаунта?{' '}
+              <Link to="/signup" className="font-medium text-foreground underline underline-offset-4">
+                Зарегистрироваться
+              </Link>
             </div>
           </form>
         </CardContent>

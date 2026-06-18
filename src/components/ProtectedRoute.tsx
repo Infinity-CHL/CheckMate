@@ -10,7 +10,7 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const { session, isLoading } = useAuth()
 
   if (isLoading) {
-    return <AppLoader fullScreen />
+    return <AppLoader />
   }
 
   return session ? <>{children}</> : <Navigate to="/login" replace />

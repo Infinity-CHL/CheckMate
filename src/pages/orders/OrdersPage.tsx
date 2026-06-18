@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { PageHeader } from '@/components/PageHeader'
 import { AppLoader } from '@/components/AppLoader'
 import { Button } from '@/components/ui/button'
 import { ORDER_STATUS, type OrderStatus } from '@/entities/order/constants/order.constants'
@@ -145,19 +144,21 @@ export const OrdersPage = () => {
   }
 
   return (
-    <div className="container mx-auto p-4 pb-6 md:p-6">
-      <PageHeader
-        title="Заказы"
-        actions={
-          <Button className="h-11 w-full sm:w-auto" onClick={() => navigate('/tables')}>
-          <Plus className="mr-2 h-4 w-4" />
-          Создать заказ
-        </Button>
-        }
-      />
-
+    <div className="container mx-auto p-4 pb-44 md:p-6 md:pb-28">
       <OrderFilters activeFilter={filter} onFilterChange={handleFilterChange} />
       <OrderList orders={filteredOrders} />
+
+      <div className="fixed inset-x-3 bottom-24 z-40 md:sticky md:bottom-4 md:inset-x-auto md:mx-auto md:mt-6 md:max-w-md">
+        <div className="rounded-3xl border border-white/70 bg-background/85 p-2 shadow-lg backdrop-blur-xl">
+          <Button
+            className="h-11 w-full rounded-2xl"
+            onClick={() => navigate('/tables')}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Создать заказ
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }

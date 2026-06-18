@@ -11,7 +11,6 @@ import { useNavigate } from 'react-router-dom'
 import Avatar from 'boring-avatars'
 import { Camera, Eye, EyeOff, LogOut } from 'lucide-react'
 
-import { PageHeader } from '@/components/PageHeader'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -36,8 +35,7 @@ const gradeLabels: Record<string, string> = {
   assistant: 'Помощник официанта',
   junior: 'Новичок',
   professional: 'Профессионал',
-  mentor: 'Наставник',
-  expert: 'Эксперт',
+  expert_mentor: 'Эксперт-наставник',
 }
 
 const fallbackNames = [
@@ -346,8 +344,6 @@ export const ProfilePage = () => {
 
   return (
     <div className="container mx-auto p-4">
-      <PageHeader title="Профиль" />
-
       <div className="mx-auto grid max-w-2xl gap-4">
         <Card className="bg-white/80">
           <CardHeader>
@@ -513,6 +509,17 @@ export const ProfilePage = () => {
 
                 {message && (
                   <p className="text-sm text-muted-foreground">{message}</p>
+                )}
+
+                {profile?.role === 'admin' && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="min-h-11 w-full"
+                    onClick={() => navigate('/admin/employees')}
+                  >
+                    Управление сотрудниками
+                  </Button>
                 )}
 
                 <div className="grid gap-2 sm:grid-cols-2">

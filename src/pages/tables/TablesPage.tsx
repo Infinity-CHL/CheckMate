@@ -1,4 +1,3 @@
-import { PageHeader } from '@/components/PageHeader'
 import { AppLoader } from '@/components/AppLoader'
 import { useTables } from '@/features/tables/hooks/useTables'
 import { TableGrid } from '@/features/tables/components/TableGrid'
@@ -20,8 +19,6 @@ export const TablesPage = () => {
 
   return (
     <div className="container mx-auto p-4 pb-6 md:p-6">
-      <PageHeader title="Столы" />
-
       <TableGrid tables={tables} />
     </div>
   )

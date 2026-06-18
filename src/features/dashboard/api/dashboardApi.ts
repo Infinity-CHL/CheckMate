@@ -3,9 +3,16 @@ import { supabase } from '@/shared/api/supabase'
 
 type DashboardOrderRow = {
   total_amount: number | null
+  tips_amount: number | null
 }
 
+export type DashboardPeriod = 'today' | 'week' | 'month'
+
 export type DashboardStats = {
+  periodRevenue: number
+  periodTips: number
+  periodClosedOrdersCount: number
+  periodAverageCheck: number
   todayRevenue: number
   todayClosedOrdersCount: number
   todayAverageCheck: number
@@ -15,6 +22,9 @@ export type DashboardStats = {
 
 const sumRevenue = (orders: DashboardOrderRow[]) =>
   orders.reduce((total, order) => total + (order.total_amount ?? 0), 0)
+
+const sumTips = (orders: DashboardOrderRow[]) =>
+  orders.reduce((total, order) => total + (order.tips_amount ?? 0), 0)
 
 const getStartOfDay = (date: Date) =>
   new Date(date.getFullYear(), date.getMonth(), date.getDate())
@@ -46,7 +56,7 @@ const getStartOfNextMonth = (date: Date) =>
 const getClosedOrdersRevenue = async (from: Date, to: Date) => {
   const { data, error } = await supabase
     .from('orders')
-    .select('total_amount')
+    .select('total_amount, tips_amount')
     .eq('status', ORDER_STATUS.CLOSED)
     .gte('closed_at', from.toISOString())
     .lt('closed_at', to.toISOString())
@@ -59,10 +69,33 @@ const getClosedOrdersRevenue = async (from: Date, to: Date) => {
   return (data || []) as DashboardOrderRow[]
 }
 
+const getPeriodRange = (period: DashboardPeriod, now: Date) => {
+  if (period === 'week') {
+    return {
+      from: getStartOfWeek(now),
+      to: getStartOfNextWeek(now),
+    }
+  }
+
+  if (period === 'month') {
+    return {
+      from: getStartOfMonth(now),
+      to: getStartOfNextMonth(now),
+    }
+  }
+
+  return {
+    from: getStartOfDay(now),
+    to: getStartOfTomorrow(now),
+  }
+}
+
 export const dashboardApi = {
-  async getStats(): Promise<DashboardStats> {
+  async getStats(period: DashboardPeriod = 'today'): Promise<DashboardStats> {
     const now = new Date()
-    const [todayOrders, weekOrders, monthOrders] = await Promise.all([
+    const periodRange = getPeriodRange(period, now)
+    const [periodOrders, todayOrders, weekOrders, monthOrders] = await Promise.all([
+      getClosedOrdersRevenue(periodRange.from, periodRange.to),
       getClosedOrdersRevenue(getStartOfDay(now), getStartOfTomorrow(now)),
       getClosedOrdersRevenue(getStartOfWeek(now), getStartOfNextWeek(now)),
       getClosedOrdersRevenue(getStartOfMonth(now), getStartOfNextMonth(now)),
@@ -70,8 +103,15 @@ export const dashboardApi = {
 
     const todayRevenue = sumRevenue(todayOrders)
     const todayClosedOrdersCount = todayOrders.length
+    const periodRevenue = sumRevenue(periodOrders)
+    const periodClosedOrdersCount = periodOrders.length
 
     return {
+      periodRevenue,
+      periodTips: sumTips(periodOrders),
+      periodClosedOrdersCount,
+      periodAverageCheck:
+        periodClosedOrdersCount > 0 ? periodRevenue / periodClosedOrdersCount : 0,
       todayRevenue,
       todayClosedOrdersCount,
       todayAverageCheck:
