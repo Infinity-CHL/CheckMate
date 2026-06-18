@@ -5,6 +5,7 @@ const ORDER_DRAFT_MAX_AGE = 2 * 60 * 60 * 1000
 export type OrderDraft = {
   orderItems: LocalOrderItem[]
   search: string
+  discountPercent: number
   createdAt: number
   sessionDraftId: string
 }
@@ -43,6 +44,7 @@ export const readOrderDraft = (tableId: string): OrderDraft | null => {
     return {
       orderItems: draft.orderItems,
       search: draft.search ?? '',
+      discountPercent: Number(draft.discountPercent) || 0,
       createdAt: draft.createdAt,
       sessionDraftId: draft.sessionDraftId,
     }

@@ -28,6 +28,8 @@ import {
   saveOrderDraft,
 } from '@/features/table-order/lib/orderDraftStorage'
 
+const DISCOUNT_OPTIONS = [5, 10, 20]
+
 export const TableOrderPage = () => {
   const { tableId } = useParams<{ tableId: string }>()
   const navigate = useNavigate()
@@ -36,6 +38,7 @@ export const TableOrderPage = () => {
   const [order, setOrder] = useState<TableOrder | null>(null)
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [orderItems, setOrderItems] = useState<LocalOrderItem[]>([])
+  const [discountPercent, setDiscountPercent] = useState(0)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -56,7 +59,7 @@ export const TableOrderPage = () => {
     )
   }, [menuItems, search])
 
-  const totalAmount = useMemo(
+  const subtotalAmount = useMemo(
     () =>
       orderItems.reduce(
         (total, item) => total + item.price * item.quantity,
@@ -64,6 +67,11 @@ export const TableOrderPage = () => {
       ),
     [orderItems]
   )
+  const discountAmount = useMemo(
+    () => Math.round(subtotalAmount * discountPercent / 100),
+    [discountPercent, subtotalAmount]
+  )
+  const totalAmount = Math.max(subtotalAmount - discountAmount, 0)
 
   useEffect(() => {
     const markBrowserUnload = () => {
@@ -119,6 +127,7 @@ export const TableOrderPage = () => {
         setOrder(openOrder)
         setMenuItems(items)
         setOrderItems(currentOrderItems.length > 0 ? currentOrderItems : draft?.orderItems ?? [])
+        setDiscountPercent(openOrder?.discount_percent ?? draft?.discountPercent ?? 0)
         setSearch(draft?.search ?? '')
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Ошибка загрузки заказа')
@@ -147,9 +156,10 @@ export const TableOrderPage = () => {
     saveOrderDraft(table.id, {
       orderItems,
       search,
+      discountPercent,
       sessionDraftId: draftSessionIdRef.current,
     })
-  }, [loading, order, orderItems, search, table])
+  }, [discountPercent, loading, order, orderItems, search, table])
 
   useEffect(() => {
     return () => {
@@ -228,7 +238,7 @@ export const TableOrderPage = () => {
       const currentOrder = order ?? await createTableOrder(user.id, table.id)
 
       await saveOrderItems(currentOrder.id, orderItems)
-      await updateOrderTotal(currentOrder.id, totalAmount)
+      await updateOrderTotal(currentOrder.id, totalAmount, discountPercent)
       removeOrderDraft(table.id)
 
       navigate('/orders')
@@ -331,11 +341,37 @@ export const TableOrderPage = () => {
           <CardContent className="space-y-2 px-3">
             <OrderReceiptItems
               items={orderItems}
+              subtotalAmount={subtotalAmount}
+              discountPercent={discountPercent}
+              discountAmount={discountAmount}
               totalAmount={totalAmount}
               onQuantityChange={handleQuantityChange}
               onNoteChange={handleNoteChange}
               onRemoveItem={handleRemoveItem}
             />
+            <div className="rounded-2xl border border-border/70 bg-background/70 p-2">
+              <div className="mb-2 text-xs font-medium text-muted-foreground">
+                Скидка
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {DISCOUNT_OPTIONS.map((discount) => (
+                  <Button
+                    key={discount}
+                    type="button"
+                    variant={discountPercent === discount ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-8 rounded-2xl"
+                    onClick={() =>
+                      setDiscountPercent((currentDiscount) =>
+                        currentDiscount === discount ? 0 : discount
+                      )
+                    }
+                  >
+                    {discount}%
+                  </Button>
+                ))}
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

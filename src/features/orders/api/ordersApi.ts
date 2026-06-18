@@ -86,6 +86,7 @@ export const ordersApi = {
         table_id: data.table_id,
         status: ORDER_STATUS.OPEN,
         total_amount: 0,
+        discount_percent: 0,
         tips_amount: 0,
       })
       .select('*, table:tables(id, number)')

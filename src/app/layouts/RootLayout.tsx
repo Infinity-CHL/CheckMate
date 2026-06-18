@@ -1,6 +1,6 @@
 import { Outlet, Link, NavLink, useLocation } from 'react-router-dom'
 import Avatar from 'boring-avatars'
-import { BarChart3, ClipboardList, LayoutGrid, User, UtensilsCrossed } from 'lucide-react'
+import { BarChart3, ClipboardList, User, UtensilsCrossed } from 'lucide-react'
 import { useAuth } from '@/features/auth/useAuth'
 
 const avatarColors = ['#2f3a2f', '#7a4f2b', '#d8a15d', '#f2dfb3', '#9f5f36']
@@ -15,7 +15,7 @@ export const RootLayout = () => {
 
   return (
     <div className="flex min-h-screen flex-col">
-      {showAppChrome && <header className="sticky top-0 z-40 border-b border-white/60 bg-background/75 backdrop-blur-xl">
+      {showAppChrome && <header className="sticky top-0 z-40 hidden border-b border-white/60 bg-background/75 backdrop-blur-xl md:block">
         <div className="container mx-auto px-4 py-3 flex justify-between items-center">
           <Link to="/" className="text-xl font-bold">
             CheckMate
@@ -76,15 +76,6 @@ export const RootLayout = () => {
               <span>Заказы</span>
             </NavLink>
             <NavLink
-              to="/tables"
-              className={({ isActive }) =>
-                `flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl px-2 text-xs font-medium transition-colors ${isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground'}`
-              }
-            >
-              <LayoutGrid className="h-5 w-5" />
-              <span>Столы</span>
-            </NavLink>
-            <NavLink
               to="/dashboard"
               className={({ isActive }) =>
                 `flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl px-2 text-xs font-medium transition-colors ${isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground'}`
@@ -92,6 +83,15 @@ export const RootLayout = () => {
             >
               <BarChart3 className="h-5 w-5" />
               <span>Аналитика</span>
+            </NavLink>
+            <NavLink
+              to="/menu"
+              className={({ isActive }) =>
+                `flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl px-2 text-xs font-medium transition-colors ${isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground'}`
+              }
+            >
+              <UtensilsCrossed className="h-5 w-5" />
+              <span>Меню</span>
             </NavLink>
             <NavLink
               to="/profile"

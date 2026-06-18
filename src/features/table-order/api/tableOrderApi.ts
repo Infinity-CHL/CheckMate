@@ -14,6 +14,7 @@ export type TableOrder = {
   waiter_id: string
   status: TableOrderStatus
   total_amount: number
+  discount_percent?: number | null
   tips_amount?: number | null
 }
 
@@ -71,6 +72,7 @@ export const createTableOrder = async (
       waiter_id: waiterId,
       status: 'open',
       total_amount: 0,
+      discount_percent: 0,
       tips_amount: 0,
     })
     .select()
@@ -222,11 +224,15 @@ export const saveOrderItems = async (
 
 export const updateOrderTotal = async (
   orderId: string,
-  totalAmount: number
+  totalAmount: number,
+  discountPercent = 0
 ): Promise<void> => {
   const { error } = await supabase
     .from('orders')
-    .update({ total_amount: totalAmount })
+    .update({
+      total_amount: totalAmount,
+      discount_percent: discountPercent,
+    })
     .eq('id', orderId)
 
   if (error) {
