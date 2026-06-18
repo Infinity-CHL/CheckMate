@@ -1,4 +1,7 @@
-import type { MenuItem } from '@/entities/menu/model/menu-item.model'
+import type {
+  MenuItem,
+  SelectedModifier,
+} from '@/entities/menu/model/menu-item.model'
 import type { OrderStatus } from '@/entities/order/constants/order.constants'
 import type { OrderItemStatus } from '@/entities/order/constants/order-item.constants'
 
@@ -30,6 +33,7 @@ export interface OrderItem {
   note: string | null
   status: OrderItemStatus | string | null
   menu_item?: MenuItem | null
+  selected_modifiers?: SelectedModifier[]
 }
 
 export interface CreateOrderData {

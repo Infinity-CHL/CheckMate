@@ -9,6 +9,7 @@ import {
   type OrderItemStatus,
 } from '@/entities/order/constants/order-item.constants'
 import type { OrderItem } from '@/entities/order/model/order.model'
+import { capitalizeFirstLetter } from '@/lib/utils'
 
 interface OrderItemsTableProps {
   items: OrderItem[]
@@ -60,7 +61,7 @@ export const OrderItemsTable = ({
             <div key={item.id} className="min-w-0 space-y-2.5 p-3">
               <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-baseline gap-2">
                 <div className="min-w-0 truncate text-sm font-medium leading-snug">
-                  {item.menu_item?.name || 'Товар'}
+                  {capitalizeFirstLetter(item.menu_item?.name) || 'Товар'}
                 </div>
                 <div className="shrink-0 whitespace-nowrap text-xs text-muted-foreground tabular-nums">
                   x{item.quantity}
@@ -102,7 +103,9 @@ export const OrderItemsTable = ({
                     size="icon-sm"
                     className="h-7 w-7 text-muted-foreground hover:text-destructive"
                     onClick={() => onRemoveItem?.(item.id)}
-                    aria-label={`Удалить ${item.menu_item?.name || 'позицию'}`}
+                    aria-label={`Удалить ${
+                      capitalizeFirstLetter(item.menu_item?.name) || 'позицию'
+                    }`}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>

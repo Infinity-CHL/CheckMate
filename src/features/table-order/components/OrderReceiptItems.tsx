@@ -4,6 +4,7 @@ import { MessageSquareMore, Minus, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import type { LocalOrderItem } from '@/features/table-order/api/tableOrderApi'
+import { capitalizeFirstLetter } from '@/lib/utils'
 
 type OrderReceiptItemsProps = {
   items: LocalOrderItem[]
@@ -11,15 +12,24 @@ type OrderReceiptItemsProps = {
   discountPercent: number
   discountAmount: number
   totalAmount: number
-  onQuantityChange: (menuItemId: string, quantity: number) => void
-  onNoteChange: (menuItemId: string, note: string) => void
-  onRemoveItem: (menuItemId: string) => void
+  onQuantityChange: (itemKey: string, quantity: number) => void
+  onNoteChange: (itemKey: string, note: string) => void
+  onRemoveItem: (itemKey: string) => void
 }
 
 const formatAmount = (value: number) =>
   new Intl.NumberFormat('ru-RU', {
     maximumFractionDigits: 0,
   }).format(value)
+
+const getOrderItemKey = (item: LocalOrderItem) => {
+  const modifierKey = (item.selectedModifiers ?? [])
+    .map((modifier) => modifier.optionId)
+    .sort()
+    .join('|')
+
+  return modifierKey ? `${item.menuItem.id}:${modifierKey}` : item.menuItem.id
+}
 
 export const OrderReceiptItems = ({
   items,
@@ -55,15 +65,16 @@ export const OrderReceiptItems = ({
     <div className="w-full min-w-0 rounded-2xl border border-dashed border-border/80 bg-background/70 shadow-sm">
       <div className="divide-y divide-dashed divide-border/80">
         {items.map((item) => {
+          const itemKey = getOrderItemKey(item)
           const itemTotal = item.price * item.quantity
           const hasNote = Boolean(item.note?.trim())
-          const isNoteExpanded = Boolean(expandedNotes[item.menuItem.id])
+          const isNoteExpanded = Boolean(expandedNotes[itemKey])
 
           return (
-            <div key={item.menuItem.id} className="min-w-0 space-y-1.5 p-2">
+            <div key={itemKey} className="min-w-0 space-y-1.5 p-2">
               <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-baseline gap-1.5">
                 <div className="min-w-0 truncate text-[13px] font-medium leading-snug">
-                  {item.menuItem.name}
+                  {capitalizeFirstLetter(item.menuItem.name)}
                 </div>
                 <div className="shrink-0 whitespace-nowrap text-xs text-muted-foreground tabular-nums">
                   x{item.quantity}
@@ -79,8 +90,8 @@ export const OrderReceiptItems = ({
                   variant={hasNote ? 'secondary' : 'ghost'}
                   size="icon-sm"
                   className="h-6 w-6"
-                  onClick={() => toggleNote(item.menuItem.id)}
-                  aria-label={`Комментарий к ${item.menuItem.name}`}
+                  onClick={() => toggleNote(itemKey)}
+                  aria-label={`Комментарий к ${capitalizeFirstLetter(item.menuItem.name)}`}
                   aria-expanded={isNoteExpanded}
                   aria-pressed={hasNote}
                 >
@@ -95,9 +106,9 @@ export const OrderReceiptItems = ({
                       size="icon-sm"
                       className="h-6 w-6"
                       onClick={() =>
-                        onQuantityChange(item.menuItem.id, item.quantity - 1)
+                        onQuantityChange(itemKey, item.quantity - 1)
                       }
-                      aria-label={`Уменьшить ${item.menuItem.name}`}
+                      aria-label={`Уменьшить ${capitalizeFirstLetter(item.menuItem.name)}`}
                     >
                       <Minus className="h-3.5 w-3.5" />
                     </Button>
@@ -110,9 +121,9 @@ export const OrderReceiptItems = ({
                       size="icon-sm"
                       className="h-6 w-6"
                       onClick={() =>
-                        onQuantityChange(item.menuItem.id, item.quantity + 1)
+                        onQuantityChange(itemKey, item.quantity + 1)
                       }
-                      aria-label={`Увеличить ${item.menuItem.name}`}
+                      aria-label={`Увеличить ${capitalizeFirstLetter(item.menuItem.name)}`}
                     >
                       <Plus className="h-3.5 w-3.5" />
                     </Button>
@@ -123,13 +134,33 @@ export const OrderReceiptItems = ({
                     variant="ghost"
                     size="icon-sm"
                     className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                    onClick={() => onRemoveItem(item.menuItem.id)}
-                    aria-label={`Удалить ${item.menuItem.name}`}
+                    onClick={() => onRemoveItem(itemKey)}
+                    aria-label={`Удалить ${capitalizeFirstLetter(item.menuItem.name)}`}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               </div>
+
+              {(item.selectedModifiers ?? []).length > 0 && (
+                <div className="space-y-0.5 text-[11px] leading-snug text-muted-foreground">
+                  {item.selectedModifiers?.map((modifier) => (
+                    <div
+                      key={`${modifier.groupId}:${modifier.optionId}`}
+                      className="flex min-w-0 justify-between gap-2"
+                    >
+                      <span className="min-w-0 truncate">
+                        {modifier.optionName}
+                      </span>
+                      {modifier.priceDelta > 0 && (
+                        <span className="shrink-0 tabular-nums">
+                          +{formatAmount(modifier.priceDelta)} в‚Ѕ
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {isNoteExpanded && (
                 <Textarea
@@ -137,7 +168,7 @@ export const OrderReceiptItems = ({
                   value={item.note ?? ''}
                   className="min-h-8 resize-none bg-background/80 px-2 py-1 text-xs leading-snug"
                   onChange={(event) =>
-                    onNoteChange(item.menuItem.id, event.target.value)
+                    onNoteChange(itemKey, event.target.value)
                   }
                 />
               )}

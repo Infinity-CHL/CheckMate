@@ -1,10 +1,14 @@
 import { supabase } from '@/shared/api/supabase'
-import type { MenuItem } from '@/entities/menu/model/menu-item.model'
+import type {
+  MenuItem,
+  SelectedModifier,
+} from '@/entities/menu/model/menu-item.model'
 import {
   ORDER_ITEM_STATUS,
   normalizeOrderItemStatus,
   type OrderItemStatus,
 } from '@/entities/order/constants/order-item.constants'
+import { insertOrderItemModifiers } from '@/features/table-order/api/orderItemModifiersApi'
 
 export type TableOrderStatus = 'open' | 'closed' | 'cancelled'
 
@@ -25,6 +29,7 @@ export type LocalOrderItem = {
   price: number
   note?: string | null
   status?: OrderItemStatus | null
+  selectedModifiers?: SelectedModifier[]
 }
 
 type OrderItemRow = {
@@ -159,12 +164,17 @@ export const saveOrderItems = async (
   }
 
   const existingItems = (existingRows || []) as OrderItemRow[]
-  const existingByMenuItemId = new Map(
-    existingItems.map((item) => [item.menu_item_id, item])
+  const existingById = new Map(existingItems.map((item) => [item.id, item]))
+  const currentItemIds = new Set(
+    items.flatMap((item) => (item.id ? [item.id] : []))
   )
-  const currentMenuItemIds = new Set(items.map((item) => item.menuItem.id))
+  const currentMenuItemIds = new Set(
+    items.flatMap((item) => (!item.id ? [item.menuItem.id] : []))
+  )
   const itemsToDelete = existingItems.filter(
-    (item) => !currentMenuItemIds.has(item.menu_item_id)
+    (item) =>
+      !currentItemIds.has(item.id) &&
+      !currentMenuItemIds.has(item.menu_item_id)
   )
 
   if (itemsToDelete.length > 0) {
@@ -180,7 +190,7 @@ export const saveOrderItems = async (
   }
 
   for (const item of items) {
-    const existingItem = existingByMenuItemId.get(item.menuItem.id)
+    const existingItem = item.id ? existingById.get(item.id) : null
 
     if (existingItem) {
       const { error: updateError } = await supabase
@@ -200,7 +210,7 @@ export const saveOrderItems = async (
       continue
     }
 
-    const { error: insertError } = await supabase
+    const { data: insertedItem, error: insertError } = await supabase
       .from('order_items')
       .insert({
         order_id: orderId,
@@ -212,11 +222,18 @@ export const saveOrderItems = async (
           ? normalizeOrderItemStatus(item.status)
           : ORDER_ITEM_STATUS.PREPARING,
       })
+      .select('*')
+      .single()
 
     if (insertError) {
       console.error('saveOrderItems insert error:', insertError)
       throw insertError
     }
+
+    await insertOrderItemModifiers(
+      (insertedItem as OrderItemRow).id,
+      item.selectedModifiers ?? []
+    )
   }
 
   return getOrderItems(orderId)
