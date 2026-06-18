@@ -5,6 +5,7 @@ import { AppLoader } from '@/components/AppLoader'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Select } from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -76,9 +77,6 @@ const getInitialFormState = (employees: Employee[]): EmployeeFormState =>
       },
     ])
   )
-
-const selectClassName =
-  'h-10 w-full rounded-xl border border-input/80 bg-background/70 px-3 text-xs shadow-sm outline-none focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50 disabled:opacity-60'
 
 export const AdminEmployeesPage = () => {
   const { user } = useAuth()
@@ -282,10 +280,9 @@ export const AdminEmployeesPage = () => {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <select
+                            <Select
                               value={state?.role ?? 'waiter'}
                               disabled={isCurrentUser}
-                              className={selectClassName}
                               onChange={(event) =>
                                 handleChange(employee.id, 'role', event.target.value as EmployeeRole)
                               }
@@ -295,12 +292,11 @@ export const AdminEmployeesPage = () => {
                                   {roleLabels[role]}
                                 </option>
                               ))}
-                            </select>
+                            </Select>
                           </TableCell>
                           <TableCell>
-                            <select
+                            <Select
                               value={state?.grade ?? 'junior'}
-                              className={selectClassName}
                               onChange={(event) =>
                                 handleChange(employee.id, 'grade', event.target.value as EmployeeGrade)
                               }
@@ -310,7 +306,7 @@ export const AdminEmployeesPage = () => {
                                   {gradeLabels[grade]}
                                 </option>
                               ))}
-                            </select>
+                            </Select>
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">
                             {formatDate(employee.created_at)}
@@ -375,10 +371,9 @@ export const AdminEmployeesPage = () => {
                       <div className="grid gap-3">
                         <label className="grid gap-1 text-xs text-muted-foreground">
                           Роль
-                          <select
+                          <Select
                             value={state?.role ?? 'waiter'}
                             disabled={isCurrentUser}
-                            className={selectClassName}
                             onChange={(event) =>
                               handleChange(employee.id, 'role', event.target.value as EmployeeRole)
                             }
@@ -388,13 +383,12 @@ export const AdminEmployeesPage = () => {
                                 {roleLabels[role]}
                               </option>
                             ))}
-                          </select>
+                          </Select>
                         </label>
                         <label className="grid gap-1 text-xs text-muted-foreground">
                           Грейд
-                          <select
+                          <Select
                             value={state?.grade ?? 'junior'}
-                            className={selectClassName}
                             onChange={(event) =>
                               handleChange(employee.id, 'grade', event.target.value as EmployeeGrade)
                             }
@@ -404,7 +398,7 @@ export const AdminEmployeesPage = () => {
                                 {gradeLabels[grade]}
                               </option>
                             ))}
-                          </select>
+                          </Select>
                         </label>
                       </div>
 
