@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
   BadgeRussianRuble,
   Clock3,
@@ -9,9 +9,10 @@ import {
 } from 'lucide-react'
 
 import { AppLoader } from '@/components/AppLoader'
+import { DateCalendar } from '@/components/DateCalendar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import type { DashboardPeriod } from '@/features/dashboard/api/dashboardApi'
+import { dashboardApi, type DashboardPeriod } from '@/features/dashboard/api/dashboardApi'
 import { useDashboardStats } from '@/features/dashboard/hooks/useDashboardStats'
 import { useAuth } from '@/features/auth/useAuth'
 
@@ -26,6 +27,31 @@ const formatNumber = (value: number) =>
   new Intl.NumberFormat('ru-RU', {
     maximumFractionDigits: 0,
   }).format(value)
+
+const formatHours = (value: number) =>
+  new Intl.NumberFormat('ru-RU', {
+    maximumFractionDigits: 1,
+  }).format(value)
+
+const getDateInputValue = (date = new Date()) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+const formatSelectedDate = (value: string) =>
+  new Intl.DateTimeFormat('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(`${value}T00:00:00`))
+
+const formatSelectedWeekday = (value: string) =>
+  new Intl.DateTimeFormat('ru-RU', {
+    weekday: 'long',
+  }).format(new Date(`${value}T00:00:00`))
 
 type IconTone = 'green' | 'amber' | 'purple' | 'blue'
 
@@ -146,18 +172,56 @@ const periodLabels: Record<DashboardPeriod, string> = {
   today: 'Сегодня',
   week: 'Неделя',
   month: 'Месяц',
+  date: 'Дата',
 }
 
 const periodTitleLabels: Record<DashboardPeriod, string> = {
   today: 'сегодня',
   week: 'неделю',
   month: 'месяц',
+  date: 'день',
 }
 
 const defaultHoursByPeriod: Record<DashboardPeriod, number> = {
   today: 8,
   week: 40,
   month: 160,
+  date: 8,
+}
+
+const getDashboardHoursKey = (
+  userId: string,
+  period: DashboardPeriod,
+  selectedDate?: string
+) =>
+  period === 'date' && selectedDate
+    ? `checkmate:dashboard-hours:${userId}:${selectedDate}`
+    : `checkmate:dashboard-hours:${userId}:${period}`
+
+const getLegacyDashboardDateHoursKey = (userId: string, selectedDate: string) =>
+  `checkmate:dashboard-hours:${userId}:date:${selectedDate}`
+
+const readDashboardHours = (
+  userId: string,
+  period: DashboardPeriod,
+  selectedDate?: string
+) => {
+  const rawHours =
+    localStorage.getItem(getDashboardHoursKey(userId, period, selectedDate)) ??
+    (period === 'date' && selectedDate
+      ? localStorage.getItem(getLegacyDashboardDateHoursKey(userId, selectedDate))
+      : null) ??
+    (period === 'date' && selectedDate === getDateInputValue()
+      ? localStorage.getItem(getDashboardHoursKey(userId, 'today'))
+      : null) ??
+    (period === 'today'
+      ? localStorage.getItem(getDashboardHoursKey(userId, 'date', getDateInputValue()))
+      : null)
+  const savedHours = rawHours === null ? Number.NaN : Number(rawHours)
+
+  return Number.isFinite(savedHours) && savedHours >= 0
+    ? String(savedHours)
+    : String(defaultHoursByPeriod[period])
 }
 
 const gradeLabels: Record<string, string> = {
@@ -193,16 +257,159 @@ const getSalaryConfig = (
 }
 
 export const DashboardPage = () => {
-  const { profile } = useAuth()
+  const { profile, user } = useAuth()
+  const [selectedDate, setSelectedDate] = useState(getDateInputValue())
+  const [workedDays, setWorkedDays] = useState<string[]>([])
+  const initialHoursInput = user?.id
+    ? readDashboardHours(user.id, 'today')
+    : String(defaultHoursByPeriod.today)
   const [period, setPeriod] = useState<DashboardPeriod>('today')
-  const [hours, setHours] = useState(defaultHoursByPeriod.today)
-  const { stats, loading, error } = useDashboardStats(period)
+  const [hoursInput, setHoursInput] = useState(initialHoursInput)
+  const [savedHoursInput, setSavedHoursInput] = useState(initialHoursInput)
+  const [hoursSaveStatus, setHoursSaveStatus] = useState<'idle' | 'saving' | 'success'>('idle')
+  const hoursSuccessTimeoutRef = useRef<number | null>(null)
+  const { stats, loading, error } = useDashboardStats(period, user?.id, selectedDate)
   const periodTitle = periodTitleLabels[period]
+  const todayFormatted = getDateInputValue()
+  const isTodaySelected =
+    period === 'date' &&
+    selectedDate === todayFormatted
+  const selectedDateLabel = formatSelectedDate(selectedDate)
+  const selectedWeekdayLabel = formatSelectedWeekday(selectedDate)
   const gradeLabel = gradeLabels[String(profile?.grade)] || 'Грейд не указан'
 
   useEffect(() => {
-    setHours(defaultHoursByPeriod[period])
-  }, [period])
+    return () => {
+      if (hoursSuccessTimeoutRef.current) {
+        window.clearTimeout(hoursSuccessTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    let isMounted = true
+
+    const fetchWorkedDays = async () => {
+      if (period !== 'date' || !user?.id) {
+        if (isMounted) {
+          setWorkedDays([])
+        }
+        return
+      }
+
+      try {
+        const days = await dashboardApi.getWorkedDaysForMonth(
+          user.id,
+          new Date(`${selectedDate}T00:00:00`)
+        )
+
+        if (isMounted) {
+          setWorkedDays(days)
+        }
+      } catch (err) {
+        console.error('DashboardPage fetchWorkedDays error:', err)
+
+        if (isMounted) {
+          setWorkedDays([])
+        }
+      }
+    }
+
+    void fetchWorkedDays()
+
+    return () => {
+      isMounted = false
+    }
+  }, [period, selectedDate, user?.id])
+
+  const parsedHours = Number(hoursInput)
+  const normalizedHours =
+    hoursInput.trim() === '' || !Number.isFinite(parsedHours)
+      ? 0
+      : Math.max(parsedHours, 0)
+  const hasHoursChanged = hoursInput !== savedHoursInput
+  const isSavingHours = hoursSaveStatus === 'saving'
+
+  const handlePeriodChange = (nextPeriod: DashboardPeriod) => {
+    const nextHoursInput = user?.id
+      ? readDashboardHours(user.id, nextPeriod, selectedDate)
+      : String(defaultHoursByPeriod[nextPeriod])
+
+    setPeriod(nextPeriod)
+    setHoursInput(nextHoursInput)
+    setSavedHoursInput(nextHoursInput)
+    setHoursSaveStatus('idle')
+
+    if (hoursSuccessTimeoutRef.current) {
+      window.clearTimeout(hoursSuccessTimeoutRef.current)
+      hoursSuccessTimeoutRef.current = null
+    }
+  }
+
+  const handleSelectedDateChange = (nextDate: string) => {
+    setSelectedDate(nextDate)
+
+    if (period !== 'date') {
+      return
+    }
+
+    const nextHoursInput = user?.id
+      ? readDashboardHours(user.id, 'date', nextDate)
+      : String(defaultHoursByPeriod.date)
+
+    setHoursInput(nextHoursInput)
+    setSavedHoursInput(nextHoursInput)
+    setHoursSaveStatus('idle')
+
+    if (hoursSuccessTimeoutRef.current) {
+      window.clearTimeout(hoursSuccessTimeoutRef.current)
+      hoursSuccessTimeoutRef.current = null
+    }
+  }
+
+  const handleSaveHours = () => {
+    if (!user?.id || !hasHoursChanged || isSavingHours) {
+      return
+    }
+
+    const nextSavedHoursInput = hoursInput.trim() === '' ? '0' : hoursInput
+
+    setHoursSaveStatus('saving')
+
+    if (hoursSuccessTimeoutRef.current) {
+      window.clearTimeout(hoursSuccessTimeoutRef.current)
+    }
+
+    hoursSuccessTimeoutRef.current = window.setTimeout(() => {
+      localStorage.setItem(
+        getDashboardHoursKey(user.id, period, selectedDate),
+        nextSavedHoursInput
+      )
+
+      if (period === 'today') {
+        localStorage.setItem(
+          getDashboardHoursKey(user.id, 'date', todayFormatted),
+          nextSavedHoursInput
+        )
+      }
+
+      if (isTodaySelected) {
+        localStorage.setItem(
+          getDashboardHoursKey(user.id, 'today'),
+          nextSavedHoursInput
+        )
+      }
+
+      setHoursInput(nextSavedHoursInput)
+      setSavedHoursInput(nextSavedHoursInput)
+      setHoursSaveStatus('success')
+
+      hoursSuccessTimeoutRef.current = window.setTimeout(() => {
+        setHoursSaveStatus('idle')
+        hoursSuccessTimeoutRef.current = null
+      }, 3000)
+    }, 250)
+  }
 
   const salary = useMemo(() => {
     const { hourlyRate, commissionPercent } = getSalaryConfig(
@@ -210,7 +417,6 @@ export const DashboardPage = () => {
       period,
       stats.periodRevenue
     )
-    const normalizedHours = Math.max(Number(hours) || 0, 0)
     const hourlyIncome = hourlyRate * normalizedHours
     const salesIncome = stats.periodRevenue * commissionPercent
 
@@ -221,7 +427,7 @@ export const DashboardPage = () => {
       salesIncome,
       totalIncome: hourlyIncome + salesIncome + stats.periodTips,
     }
-  }, [hours, period, profile?.grade, stats.periodRevenue, stats.periodTips])
+  }, [normalizedHours, period, profile?.grade, stats.periodRevenue, stats.periodTips])
 
   if (loading) {
     return <AppLoader />
@@ -233,36 +439,84 @@ export const DashboardPage = () => {
         className="mb-3 rounded-3xl p-3 ring-1 ring-foreground/5"
         style={glassPanelStyle}
       >
-        <div className="grid grid-cols-3 gap-1 rounded-2xl bg-muted/60 p-1">
+        <div className="grid grid-cols-4 gap-1 rounded-2xl bg-muted/60 p-1">
           {Object.entries(periodLabels).map(([value, label]) => (
             <Button
               key={value}
               type="button"
               variant={period === value ? 'default' : 'ghost'}
               className="h-9 rounded-xl px-2 text-xs shadow-none"
-              onClick={() => setPeriod(value as DashboardPeriod)}
+              onClick={() => handlePeriodChange(value as DashboardPeriod)}
             >
               {label}
             </Button>
           ))}
         </div>
 
+        {period === 'date' && (
+          <>
+            <DateCalendar
+              selectedDate={selectedDate}
+              workedDays={workedDays}
+              showWorkedDays
+              className="mt-3"
+              onSelectDate={handleSelectedDateChange}
+            />
+            <div className="mt-2 rounded-2xl bg-background/70 px-3 py-2 text-xs">
+              <div className="font-medium">{selectedDateLabel}</div>
+              <div className="capitalize text-muted-foreground">
+                {selectedWeekdayLabel}
+              </div>
+            </div>
+          </>
+        )}
+
         <div className="mt-3">
           <div className="mb-1 text-xs font-medium text-muted-foreground">
             Отработано часов
           </div>
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Input
               type="number"
               min={0}
               step={0.5}
-              value={hours}
-              onChange={(event) => setHours(Number(event.target.value))}
-              className="h-10 rounded-2xl text-sm"
+              value={hoursInput}
+              onChange={(event) => {
+                setHoursInput(event.target.value)
+
+                if (hoursSaveStatus === 'success') {
+                  setHoursSaveStatus('idle')
+
+                  if (hoursSuccessTimeoutRef.current) {
+                    window.clearTimeout(hoursSuccessTimeoutRef.current)
+                    hoursSuccessTimeoutRef.current = null
+                  }
+                }
+              }}
+              className="h-10 w-24 rounded-2xl text-sm"
             />
             <div className="rounded-2xl bg-background/70 px-3 py-2 text-[11px] leading-tight text-muted-foreground">
               Рекомендуем: {defaultHoursByPeriod[period]} ч
             </div>
+            <Button
+              type="button"
+              className="h-10 rounded-2xl px-4"
+              disabled={!user?.id || !hasHoursChanged || isSavingHours}
+              onClick={handleSaveHours}
+            >
+              {hoursSaveStatus === 'saving'
+                ? 'Сохранение...'
+                : hoursSaveStatus === 'success'
+                  ? 'Сохранено'
+                  : 'Сохранить часы'}
+            </Button>
+          </div>
+          <div className="mt-2 min-h-5 text-[11px] leading-tight text-muted-foreground">
+            {hoursSaveStatus === 'success' && (
+              <span className="inline-flex rounded-full border border-green-200 bg-green-50 px-2 py-1 font-medium text-green-700">
+                Часы сохранены
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -270,6 +524,12 @@ export const DashboardPage = () => {
       {error && (
         <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
           Ошибка: {error}
+        </div>
+      )}
+
+      {period === 'date' && stats.periodClosedOrdersCount === 0 && !error && (
+        <div className="mb-3 rounded-2xl border border-dashed border-border/80 bg-white/70 px-3 py-3 text-center text-xs text-muted-foreground">
+          За выбранную дату данных нет
         </div>
       )}
 
@@ -301,7 +561,7 @@ export const DashboardPage = () => {
         <MetricCard
           title="Почасовая ставка"
           value={`${formatNumber(salary.hourlyRate)} ₽/час`}
-          caption={`${formatNumber(hours)} ч = ${formatCurrency(salary.hourlyIncome)}`}
+          caption={`${formatHours(normalizedHours)} ч = ${formatCurrency(salary.hourlyIncome)}`}
           icon={Clock3}
           iconTone="blue"
         />

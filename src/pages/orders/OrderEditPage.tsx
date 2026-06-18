@@ -16,6 +16,8 @@ import {
 } from '@/features/table-order/api/tableOrderApi'
 import { OrderReceiptItems } from '@/features/table-order/components/OrderReceiptItems'
 
+const DISCOUNT_OPTIONS = [5, 10, 20]
+
 export const OrderEditPage = () => {
   const { orderId } = useParams<{ orderId: string }>()
   const navigate = useNavigate()
@@ -23,6 +25,7 @@ export const OrderEditPage = () => {
   const [order, setOrder] = useState<TableOrder | null>(null)
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [orderItems, setOrderItems] = useState<LocalOrderItem[]>([])
+  const [discountPercent, setDiscountPercent] = useState(0)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -43,7 +46,7 @@ export const OrderEditPage = () => {
     )
   }, [menuItems, search])
 
-  const totalAmount = useMemo(
+  const subtotalAmount = useMemo(
     () =>
       orderItems.reduce(
         (total, item) => total + item.price * item.quantity,
@@ -51,6 +54,11 @@ export const OrderEditPage = () => {
       ),
     [orderItems]
   )
+  const discountAmount = useMemo(
+    () => Math.round(subtotalAmount * discountPercent / 100),
+    [discountPercent, subtotalAmount]
+  )
+  const totalAmount = Math.max(subtotalAmount - discountAmount, 0)
 
   useEffect(() => {
     const initOrder = async () => {
@@ -66,6 +74,7 @@ export const OrderEditPage = () => {
         const menu = await getMenuItems()
 
         setOrder(currentOrder)
+        setDiscountPercent(currentOrder.discount_percent ?? 0)
         setMenuItems(menu)
         setOrderItems(
           items.flatMap((item) => {
@@ -151,7 +160,7 @@ export const OrderEditPage = () => {
       }
 
       await saveOrderItems(order.id, orderItems)
-      await updateOrderTotal(order.id, totalAmount)
+      await updateOrderTotal(order.id, totalAmount, discountPercent)
       navigate(`/orders/${order.id}${location.search}`, {
         state: { from: ordersBackTo },
       })
@@ -253,11 +262,37 @@ export const OrderEditPage = () => {
           <CardContent className="space-y-2 px-3">
             <OrderReceiptItems
               items={orderItems}
+              subtotalAmount={subtotalAmount}
+              discountPercent={discountPercent}
+              discountAmount={discountAmount}
               totalAmount={totalAmount}
               onQuantityChange={handleQuantityChange}
               onNoteChange={handleNoteChange}
               onRemoveItem={handleRemoveItem}
             />
+            <div className="rounded-2xl border border-border/70 bg-background/70 p-2">
+              <div className="mb-2 text-xs font-medium text-muted-foreground">
+                Скидка
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {DISCOUNT_OPTIONS.map((discount) => (
+                  <Button
+                    key={discount}
+                    type="button"
+                    variant={discountPercent === discount ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-8 rounded-2xl"
+                    onClick={() =>
+                      setDiscountPercent((currentDiscount) =>
+                        currentDiscount === discount ? 0 : discount
+                      )
+                    }
+                  >
+                    {discount}%
+                  </Button>
+                ))}
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

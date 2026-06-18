@@ -7,6 +7,9 @@ import type { LocalOrderItem } from '@/features/table-order/api/tableOrderApi'
 
 type OrderReceiptItemsProps = {
   items: LocalOrderItem[]
+  subtotalAmount: number
+  discountPercent: number
+  discountAmount: number
   totalAmount: number
   onQuantityChange: (menuItemId: string, quantity: number) => void
   onNoteChange: (menuItemId: string, note: string) => void
@@ -20,6 +23,9 @@ const formatAmount = (value: number) =>
 
 export const OrderReceiptItems = ({
   items,
+  subtotalAmount,
+  discountPercent,
+  discountAmount,
   totalAmount,
   onQuantityChange,
   onNoteChange,
@@ -60,7 +66,7 @@ export const OrderReceiptItems = ({
                   {item.menuItem.name}
                 </div>
                 <div className="shrink-0 whitespace-nowrap text-xs text-muted-foreground tabular-nums">
-                  ×{item.quantity}
+                  x{item.quantity}
                 </div>
                 <div className="shrink-0 whitespace-nowrap text-right text-[13px] font-semibold tabular-nums">
                   {formatAmount(itemTotal)} ₽
@@ -141,13 +147,29 @@ export const OrderReceiptItems = ({
       </div>
 
       <div className="border-t border-dashed border-border/80 bg-white/60 p-2.5">
-        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 text-[13px] font-semibold">
-          <span className="min-w-0 truncate">
-            Итого · {itemsCount} поз.
-          </span>
-          <span className="whitespace-nowrap text-right tabular-nums">
-            {formatAmount(totalAmount)} ₽
-          </span>
+        <div className="grid min-w-0 gap-1.5 text-[13px]">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 text-muted-foreground">
+            <span className="min-w-0 truncate">Подытог</span>
+            <span className="whitespace-nowrap text-right tabular-nums">
+              {formatAmount(subtotalAmount)} ₽
+            </span>
+          </div>
+
+          {discountPercent > 0 && (
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 text-green-700">
+              <span className="min-w-0 truncate">Скидка {discountPercent}%</span>
+              <span className="whitespace-nowrap text-right tabular-nums">
+                -{formatAmount(discountAmount)} ₽
+              </span>
+            </div>
+          )}
+
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 font-semibold">
+            <span className="min-w-0 truncate">Итого · {itemsCount} поз.</span>
+            <span className="whitespace-nowrap text-right tabular-nums">
+              {formatAmount(totalAmount)} ₽
+            </span>
+          </div>
         </div>
       </div>
     </div>

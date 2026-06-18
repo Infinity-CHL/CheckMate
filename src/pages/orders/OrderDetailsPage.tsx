@@ -260,6 +260,8 @@ export const OrderDetailsPage = () => {
           <h3 className="font-semibold mb-3">Состав заказа</h3>
           <OrderItemsTable
             items={items}
+            discountPercent={order.discount_percent ?? 0}
+            totalAmount={order.total_amount}
             onRemoveItem={isAdmin ? removeItem : undefined}
             onUpdateItemStatus={canEditOrder ? updateItemStatus : undefined}
             isReadOnly={!canEditOrder}

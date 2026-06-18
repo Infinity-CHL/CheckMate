@@ -8,6 +8,7 @@ export interface Order {
   waiter_id: string
   status: OrderStatus
   total_amount: number
+  discount_percent: number | null
   tips_amount: number | null
   created_at: string
   closed_at: string | null
