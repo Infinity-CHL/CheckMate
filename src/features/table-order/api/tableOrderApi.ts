@@ -14,6 +14,7 @@ export type TableOrder = {
   waiter_id: string
   status: TableOrderStatus
   total_amount: number
+  tips_amount?: number | null
 }
 
 export type LocalOrderItem = {
@@ -36,12 +37,14 @@ type OrderItemRow = {
 }
 
 export const getOpenOrderByTableId = async (
-  tableId: string
+  tableId: string,
+  waiterId: string
 ): Promise<TableOrder | null> => {
   const { data, error } = await supabase
     .from('orders')
     .select('*')
     .eq('table_id', tableId)
+    .eq('waiter_id', waiterId)
     .eq('status', 'open')
     .limit(1)
     .maybeSingle()
@@ -55,7 +58,7 @@ export const createTableOrder = async (
   waiterId: string,
   tableId: string
 ): Promise<TableOrder> => {
-  const existingOrder = await getOpenOrderByTableId(tableId)
+  const existingOrder = await getOpenOrderByTableId(tableId, waiterId)
 
   if (existingOrder) {
     return existingOrder
@@ -68,6 +71,7 @@ export const createTableOrder = async (
       waiter_id: waiterId,
       status: 'open',
       total_amount: 0,
+      tips_amount: 0,
     })
     .select()
     .single()
@@ -227,6 +231,21 @@ export const updateOrderTotal = async (
 
   if (error) {
     console.error('updateOrderTotal error:', error)
+    throw error
+  }
+}
+
+export const updateOrderTips = async (
+  orderId: string,
+  tipsAmount: number
+): Promise<void> => {
+  const { error } = await supabase
+    .from('orders')
+    .update({ tips_amount: tipsAmount })
+    .eq('id', orderId)
+
+  if (error) {
+    console.error('updateOrderTips error:', error)
     throw error
   }
 }

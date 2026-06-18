@@ -19,7 +19,7 @@ import {
   type TableOrder,
 } from '@/features/table-order/api/tableOrderApi'
 import { OrderReceiptItems } from '@/features/table-order/components/OrderReceiptItems'
-import { getTableById, updateTableStatus } from '@/features/tables/api/tablesApi'
+import { getTableById } from '@/features/tables/api/tablesApi'
 import { useAuth } from '@/features/auth/useAuth'
 import {
   createOrderDraftId,
@@ -96,22 +96,17 @@ export const TableOrderPage = () => {
         }
 
         const selectedTable = await getTableById(tableId)
-        const openOrder = await getOpenOrderByTableId(selectedTable.id)
+        const openOrder = await getOpenOrderByTableId(selectedTable.id, user.id)
 
         if (selectedTable.status === TABLE_STATUS.RESERVED) {
           throw new Error('Стол в резерве')
-        }
-
-        if (selectedTable.status === TABLE_STATUS.OCCUPIED && !openOrder) {
-          throw new Error('Открытый заказ для занятого стола не найден')
         }
 
         const items = await getMenuItems()
         const currentOrderItems = openOrder
           ? await getOrderItems(openOrder.id)
           : []
-        const canRestoreDraft =
-          selectedTable.status === TABLE_STATUS.FREE && !openOrder
+        const canRestoreDraft = !openOrder
         const draft = canRestoreDraft
           ? readOrderDraft(selectedTable.id)
           : null
@@ -140,7 +135,7 @@ export const TableOrderPage = () => {
       return
     }
 
-    if (table.status !== TABLE_STATUS.FREE || order) {
+    if (table.status === TABLE_STATUS.RESERVED || order) {
       return
     }
 
@@ -159,7 +154,8 @@ export const TableOrderPage = () => {
   useEffect(() => {
     return () => {
       if (
-        table?.status === TABLE_STATUS.FREE &&
+        table &&
+        table.status !== TABLE_STATUS.RESERVED &&
         !order &&
         !isBrowserUnloadRef.current
       ) {
@@ -233,7 +229,6 @@ export const TableOrderPage = () => {
 
       await saveOrderItems(currentOrder.id, orderItems)
       await updateOrderTotal(currentOrder.id, totalAmount)
-      await updateTableStatus(table.id, TABLE_STATUS.OCCUPIED)
       removeOrderDraft(table.id)
 
       navigate('/orders')
@@ -258,7 +253,7 @@ export const TableOrderPage = () => {
   }
 
   return (
-    <div className="container mx-auto p-4 pb-28 md:p-6 md:pb-6">
+    <div className="container mx-auto max-w-5xl p-3 pb-44 md:p-6 md:pb-8">
       <PageHeader
         title={`Заказ стола №${table?.number ?? '—'}`}
         backTo="/orders"
@@ -270,14 +265,14 @@ export const TableOrderPage = () => {
         </div>
       )}
 
-      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
-        <Card className="min-w-0">
-          <CardHeader>
-            <CardTitle>Меню</CardTitle>
+      <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
+        <Card size="sm" className="min-w-0 gap-2 overflow-visible">
+          <CardHeader className="px-3">
+            <CardTitle className="text-xs">Меню</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-2 px-3">
             <Input
-              className="h-9"
+              className="h-8"
               placeholder="Поиск блюда"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
@@ -329,11 +324,11 @@ export const TableOrderPage = () => {
           </CardContent>
         </Card>
 
-        <Card className="min-w-0">
-          <CardHeader>
-            <CardTitle>Состав заказа</CardTitle>
+        <Card size="sm" className="min-w-0 gap-2 overflow-visible">
+          <CardHeader className="px-3">
+            <CardTitle className="text-xs">Состав заказа</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-2 px-3">
             <OrderReceiptItems
               items={orderItems}
               totalAmount={totalAmount}
@@ -341,18 +336,20 @@ export const TableOrderPage = () => {
               onNoteChange={handleNoteChange}
               onRemoveItem={handleRemoveItem}
             />
-
-            <div className="sticky bottom-20 -mx-4 space-y-3 border-t bg-background p-4 md:static md:mx-0 md:border-t-0 md:p-0">
-              <Button
-                className="h-11 w-full"
-                onClick={() => setShowSaveConfirmation(true)}
-                disabled={saving || orderItems.length === 0}
-              >
-                {saving ? 'Сохранение...' : 'Сохранить заказ'}
-              </Button>
-            </div>
           </CardContent>
         </Card>
+      </div>
+
+      <div className="fixed inset-x-3 bottom-24 z-40 md:sticky md:bottom-4 md:inset-x-auto md:mx-auto md:mt-4 md:max-w-md">
+        <div className="rounded-3xl border border-white/70 bg-background/85 p-2 shadow-lg backdrop-blur-xl">
+          <Button
+            className="h-11 w-full rounded-2xl"
+            onClick={() => setShowSaveConfirmation(true)}
+            disabled={saving || orderItems.length === 0}
+          >
+            {saving ? 'Сохранение...' : 'Сохранить заказ'}
+          </Button>
+        </div>
       </div>
 
       {showSaveConfirmation && (
@@ -362,22 +359,24 @@ export const TableOrderPage = () => {
               <CardHeader>
                 <CardTitle>Сохранить заказ?</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="flex justify-end gap-2">
+              <CardContent className="space-y-3">
+                <div className="flex flex-col gap-2 sm:flex-row-reverse sm:justify-start">
                   <Button
                     type="button"
-                    variant="outline"
-                    onClick={() => setShowSaveConfirmation(false)}
-                    disabled={saving}
-                  >
-                    Нет
-                  </Button>
-                  <Button
-                    type="button"
+                    className="h-12 w-full rounded-2xl text-sm sm:w-auto sm:min-w-28"
                     onClick={handleSaveOrder}
                     disabled={saving}
                   >
-                    {saving ? 'Сохранение...' : 'Да'}
+                    {saving ? 'Сохранение...' : 'Сохранить'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-12 w-full rounded-2xl text-sm sm:w-auto sm:min-w-28"
+                    onClick={() => setShowSaveConfirmation(false)}
+                    disabled={saving}
+                  >
+                    Отмена
                   </Button>
                 </div>
               </CardContent>

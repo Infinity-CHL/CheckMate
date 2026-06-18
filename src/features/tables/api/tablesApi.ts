@@ -1,6 +1,7 @@
 import { supabase } from '@/shared/api/supabase'
 import type { RestaurantTable } from '@/entities/table/model/table.model'
 import type { TableStatus } from '@/entities/table/constants/table.constants'
+import { ORDER_STATUS } from '@/entities/order/constants/order.constants'
 
 export const getTables = async (): Promise<RestaurantTable[]> => {
   const { data, error } = await supabase
@@ -11,6 +12,20 @@ export const getTables = async (): Promise<RestaurantTable[]> => {
   if (error) throw error
 
   return data || []
+}
+
+export const getOpenTableIdsByWaiterId = async (
+  waiterId: string
+): Promise<Set<string>> => {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('table_id')
+    .eq('waiter_id', waiterId)
+    .eq('status', ORDER_STATUS.OPEN)
+
+  if (error) throw error
+
+  return new Set((data || []).map((order) => order.table_id))
 }
 
 export const getTableById = async (tableId: string): Promise<RestaurantTable> => {

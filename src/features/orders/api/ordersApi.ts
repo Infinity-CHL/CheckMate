@@ -2,7 +2,6 @@ import { supabase } from '@/shared/api/supabase'
 import type { Order, OrderItem, CreateOrderData, CreateOrderItemData } from '@/entities/order/model/order.model'
 import { ORDER_ITEM_STATUS, type OrderItemStatus } from '@/entities/order/constants/order-item.constants'
 import { ORDER_STATUS } from '@/entities/order/constants/order.constants'
-import { TABLE_STATUS } from '@/entities/table/constants/table.constants'
 
 export const ordersApi = {
   async getOrders(waiterId: string): Promise<Order[]> {
@@ -69,6 +68,7 @@ export const ordersApi = {
       .from('orders')
       .select('*, table:tables(id, number)')
       .eq('table_id', data.table_id)
+      .eq('waiter_id', waiterId)
       .eq('status', ORDER_STATUS.OPEN)
       .limit(1)
       .maybeSingle()
@@ -86,6 +86,7 @@ export const ordersApi = {
         table_id: data.table_id,
         status: ORDER_STATUS.OPEN,
         total_amount: 0,
+        tips_amount: 0,
       })
       .select('*, table:tables(id, number)')
       .single()
@@ -126,18 +127,19 @@ export const ordersApi = {
     }
   },
 
-  async closeOrder(orderId: string): Promise<void> {
-    const { data: order, error: orderSelectError } = await supabase
+  async updateOrderTips(orderId: string, tipsAmount: number): Promise<void> {
+    const { error } = await supabase
       .from('orders')
-      .select('id, table_id')
+      .update({ tips_amount: tipsAmount })
       .eq('id', orderId)
-      .single()
 
-    if (orderSelectError) {
-      console.error('ordersApi.closeOrder order select error:', orderSelectError)
-      throw orderSelectError
+    if (error) {
+      console.error('ordersApi.updateOrderTips update error:', error)
+      throw error
     }
+  },
 
+  async closeOrder(orderId: string): Promise<void> {
     const { error: orderUpdateError } = await supabase
       .from('orders')
       .update({
@@ -149,16 +151,6 @@ export const ordersApi = {
     if (orderUpdateError) {
       console.error('ordersApi.closeOrder order update error:', orderUpdateError)
       throw orderUpdateError
-    }
-
-    const { error: tableUpdateError } = await supabase
-      .from('tables')
-      .update({ status: TABLE_STATUS.FREE })
-      .eq('id', order.table_id)
-
-    if (tableUpdateError) {
-      console.error('ordersApi.closeOrder table update error:', tableUpdateError)
-      throw tableUpdateError
     }
   },
 
@@ -202,9 +194,9 @@ export const ordersApi = {
   },
 
   async deleteOrder(orderId: string): Promise<void> {
-    const { data: order, error: orderSelectError } = await supabase
+    const { error: orderSelectError } = await supabase
       .from('orders')
-      .select('*')
+      .select('id')
       .eq('id', orderId)
       .single()
 
@@ -231,30 +223,6 @@ export const ordersApi = {
     if (orderError) {
       console.error('ordersApi.deleteOrder orders delete error:', orderError)
       throw orderError
-    }
-
-    const { data: openOrders, error: openOrdersError } = await supabase
-      .from('orders')
-      .select('id')
-      .eq('table_id', order.table_id)
-      .eq('status', ORDER_STATUS.OPEN)
-      .limit(1)
-
-    if (openOrdersError) {
-      console.error('ordersApi.deleteOrder open orders select error:', openOrdersError)
-      throw openOrdersError
-    }
-
-    if ((openOrders || []).length === 0) {
-      const { error: tableError } = await supabase
-        .from('tables')
-        .update({ status: 'free' })
-        .eq('id', order.table_id)
-
-      if (tableError) {
-        console.error('ordersApi.deleteOrder table status update error:', tableError)
-        throw tableError
-      }
     }
   },
 }

@@ -28,6 +28,7 @@ export const OrderReceiptItems = ({
   const [expandedNotes, setExpandedNotes] = useState<Record<string, boolean>>(
     {}
   )
+  const itemsCount = items.length
 
   const toggleNote = (menuItemId: string) => {
     setExpandedNotes((current) => ({
@@ -38,14 +39,14 @@ export const OrderReceiptItems = ({
 
   if (items.length === 0) {
     return (
-      <div className="rounded-3xl border border-dashed border-border/80 bg-background/70 px-3 py-8 text-center shadow-sm">
+      <div className="rounded-2xl border border-dashed border-border/80 bg-background/70 px-3 py-5 text-center shadow-sm">
         <p className="text-muted-foreground">Позиции не добавлены</p>
       </div>
     )
   }
 
   return (
-    <div className="w-full min-w-0 overflow-hidden rounded-3xl border border-dashed border-border/80 bg-background/70 shadow-sm">
+    <div className="w-full min-w-0 rounded-2xl border border-dashed border-border/80 bg-background/70 shadow-sm">
       <div className="divide-y divide-dashed divide-border/80">
         {items.map((item) => {
           const itemTotal = item.price * item.quantity
@@ -53,25 +54,25 @@ export const OrderReceiptItems = ({
           const isNoteExpanded = Boolean(expandedNotes[item.menuItem.id])
 
           return (
-            <div key={item.menuItem.id} className="min-w-0 space-y-2 p-2.5">
-              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-baseline gap-2">
-                <div className="min-w-0 truncate text-sm font-medium leading-snug">
+            <div key={item.menuItem.id} className="min-w-0 space-y-1.5 p-2">
+              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-baseline gap-1.5">
+                <div className="min-w-0 truncate text-[13px] font-medium leading-snug">
                   {item.menuItem.name}
                 </div>
                 <div className="shrink-0 whitespace-nowrap text-xs text-muted-foreground tabular-nums">
                   ×{item.quantity}
                 </div>
-                <div className="shrink-0 whitespace-nowrap text-right text-sm font-semibold tabular-nums">
+                <div className="shrink-0 whitespace-nowrap text-right text-[13px] font-semibold tabular-nums">
                   {formatAmount(itemTotal)} ₽
                 </div>
               </div>
 
-              <div className="flex min-w-0 items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center justify-between gap-1.5">
                 <Button
                   type="button"
                   variant={hasNote ? 'secondary' : 'ghost'}
                   size="icon-sm"
-                  className="h-7 w-7"
+                  className="h-6 w-6"
                   onClick={() => toggleNote(item.menuItem.id)}
                   aria-label={`Комментарий к ${item.menuItem.name}`}
                   aria-expanded={isNoteExpanded}
@@ -80,13 +81,13 @@ export const OrderReceiptItems = ({
                   <MessageSquareMore className="h-3.5 w-3.5" />
                 </Button>
 
-                <div className="flex min-w-0 items-center gap-1.5">
+                <div className="flex min-w-0 items-center gap-1">
                   <div className="flex shrink-0 items-center border bg-background">
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon-sm"
-                      className="h-7 w-7"
+                      className="h-6 w-6"
                       onClick={() =>
                         onQuantityChange(item.menuItem.id, item.quantity - 1)
                       }
@@ -94,14 +95,14 @@ export const OrderReceiptItems = ({
                     >
                       <Minus className="h-3.5 w-3.5" />
                     </Button>
-                    <div className="min-w-6 px-1 text-center text-xs font-medium tabular-nums">
+                    <div className="min-w-5 px-1 text-center text-xs font-medium tabular-nums">
                       {item.quantity}
                     </div>
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon-sm"
-                      className="h-7 w-7"
+                      className="h-6 w-6"
                       onClick={() =>
                         onQuantityChange(item.menuItem.id, item.quantity + 1)
                       }
@@ -115,7 +116,7 @@ export const OrderReceiptItems = ({
                     type="button"
                     variant="ghost"
                     size="icon-sm"
-                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                    className="h-6 w-6 text-muted-foreground hover:text-destructive"
                     onClick={() => onRemoveItem(item.menuItem.id)}
                     aria-label={`Удалить ${item.menuItem.name}`}
                   >
@@ -128,7 +129,7 @@ export const OrderReceiptItems = ({
                 <Textarea
                   placeholder="Комментарий к позиции"
                   value={item.note ?? ''}
-                  className="min-h-9 resize-none bg-background/80 px-2 py-1.5 text-xs leading-snug"
+                  className="min-h-8 resize-none bg-background/80 px-2 py-1 text-xs leading-snug"
                   onChange={(event) =>
                     onNoteChange(item.menuItem.id, event.target.value)
                   }
@@ -139,9 +140,11 @@ export const OrderReceiptItems = ({
         })}
       </div>
 
-      <div className="border-t border-dashed border-border/80 bg-white/60 p-3">
-        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 text-sm font-semibold">
-          <span>Итого:</span>
+      <div className="border-t border-dashed border-border/80 bg-white/60 p-2.5">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 text-[13px] font-semibold">
+          <span className="min-w-0 truncate">
+            Итого · {itemsCount} поз.
+          </span>
           <span className="whitespace-nowrap text-right tabular-nums">
             {formatAmount(totalAmount)} ₽
           </span>

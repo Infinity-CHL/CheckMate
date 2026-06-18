@@ -1,5 +1,6 @@
-import { createBrowserRouter } from 'react-router-dom'
+import { Navigate, createBrowserRouter } from 'react-router-dom'
 import { RootLayout } from '@/app/layouts/RootLayout'
+import { AdminLayout } from '@/app/layouts/AdminLayout'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { OrdersPage } from '@/pages/orders/OrdersPage'
 import { OrderDetailsPage } from '@/pages/orders/OrderDetailsPage'
@@ -10,6 +11,8 @@ import { TableOrderPage } from '@/pages/tables/TableOrderPage'
 import { DashboardPage } from '@/pages/dashboard/DashboardPage'
 import { MenuPage } from '@/pages/menu/MenuPage'
 import { ProfilePage } from '@/pages/profile/ProfilePage'
+import { AdminEmployeesPage } from '@/pages/admin/AdminEmployeesPage'
+import { AdminAnalyticsPage } from '@/pages/admin/AdminAnalyticsPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { SignUpPage } from '@/pages/SignUpPage'
 import { AuthCallback } from '@/pages/auth/AuthCallback'
@@ -24,6 +27,15 @@ export const router = createBrowserRouter([
       { path: 'dashboard', element: <ProtectedRoute><DashboardPage /></ProtectedRoute> },
       { path: 'menu', element: <ProtectedRoute><MenuPage /></ProtectedRoute> },
       { path: 'profile', element: <ProtectedRoute><ProfilePage /></ProtectedRoute> },
+      {
+        path: 'admin',
+        element: <ProtectedRoute><AdminLayout /></ProtectedRoute>,
+        children: [
+          { index: true, element: <Navigate to="/admin/employees" replace /> },
+          { path: 'employees', element: <AdminEmployeesPage /> },
+          { path: 'analytics', element: <AdminAnalyticsPage /> },
+        ],
+      },
       { path: 'tables', element: <ProtectedRoute><TablesPage /></ProtectedRoute> },
       { path: 'tables/:tableId/order', element: <ProtectedRoute><TableOrderPage /></ProtectedRoute> },
       { path: 'orders', element: <ProtectedRoute><OrdersPage /></ProtectedRoute> },
