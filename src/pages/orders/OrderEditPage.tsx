@@ -5,6 +5,7 @@ import { AppLoader } from '@/components/AppLoader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { capitalizeFirstLetter } from '@/lib/utils'
 import type { MenuItem } from '@/entities/menu/model/menu-item.model'
 import { ordersApi } from '@/features/orders/api/ordersApi'
 import { getMenuItems } from '@/features/menu/api/menuApi'
@@ -226,7 +227,9 @@ export const OrderEditPage = () => {
                       }}
                     >
                       <div className="min-w-0">
-                        <div className="truncate text-sm font-medium">{item.name}</div>
+                        <div className="truncate text-sm font-medium">
+                          {capitalizeFirstLetter(item.name)}
+                        </div>
                         <div className="mt-0.5 text-xs text-muted-foreground">
                           {item.price} ₽
                         </div>
@@ -239,7 +242,7 @@ export const OrderEditPage = () => {
                           event.stopPropagation()
                           handleAddItem(item)
                         }}
-                        aria-label={`Добавить ${item.name}`}
+                        aria-label={`Добавить ${capitalizeFirstLetter(item.name)}`}
                       >
                         +
                       </Button>

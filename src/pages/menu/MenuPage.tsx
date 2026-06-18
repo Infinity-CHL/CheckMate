@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { MenuItem } from '@/entities/menu/model/menu-item.model'
 import { getActiveMenuItems } from '@/features/menu/api/menuApi'
+import { capitalizeFirstLetter } from '@/lib/utils'
 
 type MenuCategory = 'main' | 'bar' | 'kids'
 
@@ -99,7 +100,9 @@ export const MenuPage = () => {
             return (
               <Card key={item.id} className="min-h-32 bg-white/80">
                 <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-3">
-                  <CardTitle className="text-lg">{item.name}</CardTitle>
+                  <CardTitle className="text-lg">
+                    {capitalizeFirstLetter(item.name)}
+                  </CardTitle>
                   <Badge variant="outline">{categoryLabels[category]}</Badge>
                 </CardHeader>
                 <CardContent>
