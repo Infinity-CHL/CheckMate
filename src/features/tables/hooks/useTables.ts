@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { TABLE_STATUS } from '@/entities/table/constants/table.constants'
 import type { RestaurantTable } from '@/entities/table/model/table.model'
 import {
-  getOpenTableIdsByWaiterId,
+  ensureDefaultTables,
+  getOpenTableOrdersByWaiterId,
   getTables,
 } from '@/features/tables/api/tablesApi'
 import { useAuth } from '@/features/auth/useAuth'
@@ -22,19 +23,20 @@ export const useTables = () => {
         return
       }
 
-      const [data, occupiedTableIds] = await Promise.all([
+      await ensureDefaultTables()
+
+      const [data, openOrderByTableId] = await Promise.all([
         getTables(),
-        getOpenTableIdsByWaiterId(user.id),
+        getOpenTableOrdersByWaiterId(user.id),
       ])
 
       setTables(
         data.map((table) => ({
           ...table,
-          status: occupiedTableIds.has(table.id)
+          activeOrderId: openOrderByTableId.get(table.id) ?? null,
+          status: openOrderByTableId.has(table.id)
             ? TABLE_STATUS.OCCUPIED
-            : table.status === TABLE_STATUS.RESERVED
-              ? TABLE_STATUS.RESERVED
-              : TABLE_STATUS.FREE,
+            : TABLE_STATUS.FREE,
         }))
       )
       setError(null)
