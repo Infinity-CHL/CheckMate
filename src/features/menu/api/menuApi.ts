@@ -25,6 +25,8 @@ export const getMenuItems = async (): Promise<MenuItem[]> => {
   const { data, error } = await supabase
     .from('menu_items')
     .select('*')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true, nullsFirst: false })
     .order('name', { ascending: true })
 
   if (error) throw error
@@ -33,15 +35,7 @@ export const getMenuItems = async (): Promise<MenuItem[]> => {
 }
 
 export const getActiveMenuItems = async (): Promise<MenuItem[]> => {
-  const { data, error } = await supabase
-    .from('menu_items')
-    .select('*')
-    .eq('is_active', true)
-    .order('name', { ascending: true })
-
-  if (error) throw error
-
-  return (data || []) as MenuItem[]
+  return getMenuItems()
 }
 
 export const getModifiersForMenuItem = async (

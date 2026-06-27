@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import Avatar from 'boring-avatars'
 
 import { AppLoader } from '@/components/AppLoader'
+import { UserNiceAvatar } from '@/components/UserNiceAvatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -24,8 +24,6 @@ import {
   type EmployeeRole,
 } from '@/features/admin/api/employeesApi'
 import { useAuth } from '@/features/auth/useAuth'
-
-const avatarColors = ['#2f3a2f', '#7a4f2b', '#d8a15d', '#f2dfb3', '#9f5f36']
 
 const roleLabels: Record<EmployeeRole, string> = {
   admin: 'Администратор',
@@ -66,6 +64,9 @@ const formatDate = (value: string | null) => {
 
 const getEmployeeName = (employee: Employee) =>
   employee.full_name?.trim() || employee.email || 'Сотрудник'
+
+const getEmployeeAvatarSeed = (employee: Employee) =>
+  employee.id || employee.email || getEmployeeName(employee)
 
 const getInitialFormState = (employees: Employee[]): EmployeeFormState =>
   Object.fromEntries(
@@ -258,10 +259,8 @@ export const AdminEmployeesPage = () => {
                                     className="h-full w-full object-cover"
                                   />
                                 ) : (
-                                  <Avatar
-                                    name={getEmployeeName(employee)}
-                                    variant="beam"
-                                    colors={avatarColors}
+                                  <UserNiceAvatar
+                                    seed={getEmployeeAvatarSeed(employee)}
                                     size={44}
                                   />
                                 )}
@@ -347,10 +346,8 @@ export const AdminEmployeesPage = () => {
                               className="h-full w-full object-cover"
                             />
                           ) : (
-                            <Avatar
-                              name={getEmployeeName(employee)}
-                              variant="beam"
-                              colors={avatarColors}
+                            <UserNiceAvatar
+                              seed={getEmployeeAvatarSeed(employee)}
                               size={48}
                             />
                           )}

@@ -36,7 +36,14 @@ export interface MenuItem {
   name: string
   price: number
   category?: string | null
+  menu_section?: string | null
+  item_type?: string | null
+  description?: string | null
+  volume_ml?: number | null
+  is_alcohol?: boolean | null
   is_active?: boolean | null
+  discount_allowed?: boolean | null
+  sort_order?: number | null
   modifier_groups?: ModifierGroup[]
   created_at?: string
   updated_at?: string

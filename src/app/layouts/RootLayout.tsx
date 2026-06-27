@@ -1,14 +1,12 @@
 import { Outlet, Link, NavLink, useLocation } from 'react-router-dom'
-import Avatar from 'boring-avatars'
 import { BarChart3, ClipboardList, User, UtensilsCrossed } from 'lucide-react'
+import { UserNiceAvatar } from '@/components/UserNiceAvatar'
 import { useAuth } from '@/features/auth/useAuth'
-
-const avatarColors = ['#2f3a2f', '#7a4f2b', '#d8a15d', '#f2dfb3', '#9f5f36']
 
 export const RootLayout = () => {
   const { user, profile } = useAuth()
   const location = useLocation()
-  const avatarSeed = profile?.full_name || user?.email || user?.id || 'CheckMate'
+  const avatarSeed = user?.id || user?.email || profile?.full_name || 'CheckMate'
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup'
   const isAdminPage = location.pathname.startsWith('/admin')
   const showAppChrome = !isAuthPage && !isAdminPage
@@ -108,12 +106,7 @@ export const RootLayout = () => {
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <Avatar
-                    name={avatarSeed}
-                    variant="beam"
-                    colors={avatarColors}
-                    size={36}
-                  />
+                  <UserNiceAvatar seed={avatarSeed} size={36} />
                 )}
               </span>
             </NavLink>

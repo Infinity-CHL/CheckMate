@@ -8,9 +8,9 @@ import {
   type SetStateAction,
 } from 'react'
 import { useNavigate } from 'react-router-dom'
-import Avatar from 'boring-avatars'
 import { Camera, Eye, EyeOff, LogOut } from 'lucide-react'
 
+import { UserNiceAvatar } from '@/components/UserNiceAvatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -45,8 +45,6 @@ const fallbackNames = [
   'Мастер Сервиса',
   'Капитан Столов',
 ]
-
-const avatarColors = ['#2f3a2f', '#7a4f2b', '#d8a15d', '#f2dfb3', '#9f5f36']
 
 const splitFullName = (fullName: string | null | undefined) => {
   const trimmedName = fullName?.trim() ?? ''
@@ -173,7 +171,7 @@ export const ProfilePage = () => {
   const email = user?.email ?? 'Почта не указана'
   const role = getLabel(profile?.role, roleLabels)
   const grade = getLabel(profile?.grade, gradeLabels, 'Новичок')
-  const avatarName = savedFullName.trim() || user?.email || fallbackName
+  const avatarSeed = user?.id || user?.email || savedFullName.trim() || fallbackName
   const avatarImageUrl = avatarPreview ?? savedAvatarUrl
 
   const resetEditState = () => {
@@ -362,12 +360,7 @@ export const ProfilePage = () => {
                           className="h-full w-full object-cover"
                         />
                       ) : (
-                        <Avatar
-                          name={avatarName}
-                          variant="beam"
-                          colors={avatarColors}
-                          size={112}
-                        />
+                        <UserNiceAvatar seed={avatarSeed} size={112} />
                       )}
                     </div>
                     <Button
@@ -487,12 +480,7 @@ export const ProfilePage = () => {
                         className="h-full w-full object-cover"
                       />
                     ) : (
-                      <Avatar
-                        name={avatarName}
-                        variant="beam"
-                        colors={avatarColors}
-                        size={112}
-                      />
+                      <UserNiceAvatar seed={avatarSeed} size={112} />
                     )}
                   </div>
                 </div>
