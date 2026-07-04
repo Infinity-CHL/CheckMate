@@ -3,7 +3,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/shared/api/supabase'
 import { ordersApi } from '../api/ordersApi'
 import type { Order, OrderItem } from '@/entities/order/model/order.model'
-import type { OrderItemStatus } from '@/entities/order/constants/order-item.constants'
+import {
+  normalizeOrderItemStatus,
+  type OrderItemStatus,
+} from '@/entities/order/constants/order-item.constants'
 import { removeOrderDraft } from '@/features/table-order/lib/orderDraftStorage'
 
 export const useOrderDetails = (orderId: string | undefined) => {
@@ -42,7 +45,18 @@ export const useOrderDetails = (orderId: string | undefined) => {
           table: 'order_items',
           filter: `order_id=eq.${orderId}`
         },
-        () => {
+        (payload) => {
+          if (payload.eventType === 'UPDATE' && payload.new?.id) {
+            const updatedItem = payload.new as Partial<OrderItem> & { id: string }
+
+            setItems((currentItems) =>
+              currentItems.map((item) =>
+                item.id === updatedItem.id ? { ...item, ...updatedItem } : item
+              )
+            )
+            return
+          }
+
           fetchOrderDetails()
         }
       )
@@ -112,14 +126,38 @@ export const useOrderDetails = (orderId: string | undefined) => {
     itemId: string,
     status: OrderItemStatus
   ) => {
+    let previousStatus: OrderItemStatus | null = null
+
+    setItems((currentItems) =>
+      currentItems.map((item) => {
+        if (item.id !== itemId) {
+          return item
+        }
+
+        previousStatus = normalizeOrderItemStatus(item.status)
+
+        return {
+          ...item,
+          status,
+        }
+      })
+    )
+
     try {
       await ordersApi.updateOrderItemStatus(itemId, status)
-      await fetchOrderDetails()
     } catch (err) {
+      if (previousStatus) {
+        setItems((currentItems) =>
+          currentItems.map((item) =>
+            item.id === itemId ? { ...item, status: previousStatus } : item
+          )
+        )
+      }
+
       setError(err instanceof Error ? err.message : 'Ошибка обновления статуса позиции')
       throw err
     }
-  }, [fetchOrderDetails])
+  }, [])
 
   const deleteOrder = useCallback(async () => {
     if (!orderId) return

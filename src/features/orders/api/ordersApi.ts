@@ -3,6 +3,56 @@ import type { Order, OrderItem, CreateOrderData, CreateOrderItemData } from '@/e
 import { ORDER_ITEM_STATUS, type OrderItemStatus } from '@/entities/order/constants/order-item.constants'
 import { ORDER_STATUS } from '@/entities/order/constants/order.constants'
 
+export type TransferableUser = {
+  id: string
+  email: string | null
+  full_name: string | null
+  role: string | null
+  grade: string | null
+  is_active?: boolean | null
+}
+
+const USERS_SELECT_RLS_ERROR =
+  'Нет прав на просмотр сотрудников. Нужно обновить RLS policy для public.users.'
+
+const transferOrderErrorMessages: Record<string, string> = {
+  not_authenticated: 'Нужно войти в аккаунт',
+  order_not_found: 'Заказ не найден',
+  only_order_owner_can_transfer:
+    'Передать заказ может только владелец заказа',
+  cannot_transfer_to_yourself: 'Нельзя передать заказ самому себе',
+  closed_order_cannot_be_transferred: 'Закрытый заказ нельзя передать',
+  target_user_not_found: 'Сотрудник не найден',
+}
+
+const isRlsError = (error: { code?: string; message?: string }) => {
+  const message = error.message?.toLowerCase() ?? ''
+
+  return (
+    error.code === '42501' ||
+    message.includes('row-level security') ||
+    message.includes('permission denied')
+  )
+}
+
+const getTransferableUserName = (user: TransferableUser) =>
+  user.full_name?.trim() || user.email || 'Сотрудник'
+
+const getTransferOrderErrorMessage = (message?: string | null) => {
+  if (!message) {
+    return 'Не удалось передать заказ'
+  }
+
+  const normalizedMessage = message.toLowerCase()
+  const matchedCode = Object.keys(transferOrderErrorMessages).find((code) =>
+    normalizedMessage.includes(code)
+  )
+
+  return matchedCode
+    ? transferOrderErrorMessages[matchedCode]
+    : 'Не удалось передать заказ'
+}
+
 export const ordersApi = {
   async getOrders(waiterId: string): Promise<Order[]> {
     const { data, error } = await supabase
@@ -57,6 +107,7 @@ export const ordersApi = {
       .from('order_items')
       .select('*, menu_item:menu_items(id, name, price, category)')
       .eq('order_id', orderId)
+      .order('created_at', { ascending: true })
 
     if (itemsError) throw itemsError
 
@@ -137,6 +188,64 @@ export const ordersApi = {
     if (error) {
       console.error('ordersApi.updateOrderTips update error:', error)
       throw error
+    }
+  },
+
+  async getTransferableUsers(
+    currentUserId: string
+  ): Promise<TransferableUser[]> {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+
+    if (error) {
+      console.error('ordersApi.getTransferableUsers select error:', error)
+
+      if (isRlsError(error)) {
+        throw new Error(USERS_SELECT_RLS_ERROR)
+      }
+
+      throw error
+    }
+
+    const users = (data || []) as TransferableUser[]
+
+    if (
+      users.length > 0 &&
+      users.every((transferUser) => transferUser.id === currentUserId)
+    ) {
+      throw new Error(
+        'Supabase вернул только текущего пользователя. Проверьте RLS policy для public.users, чтобы сотрудники могли видеть друг друга для передачи заказа.'
+      )
+    }
+
+    return users
+      .filter((user) => user.id !== currentUserId)
+      .filter((user) => user.is_active !== false)
+      .filter(
+        (user) =>
+          !user.role || ['waiter', 'manager', 'admin'].includes(user.role)
+      )
+      .sort((firstUser, secondUser) =>
+        getTransferableUserName(firstUser).localeCompare(
+          getTransferableUserName(secondUser),
+          'ru'
+        )
+      )
+  },
+
+  async transferOrder(
+    orderId: string,
+    targetUserId: string
+  ): Promise<void> {
+    const { error } = await supabase.rpc('transfer_order', {
+      p_order_id: orderId,
+      p_target_user_id: targetUserId,
+    })
+
+    if (error) {
+      console.error('ordersApi.transferOrder rpc error:', error)
+      throw new Error(getTransferOrderErrorMessage(error.message))
     }
   },
 

@@ -10,6 +10,7 @@ import { TablesPage } from '@/pages/tables/TablesPage'
 import { TableOrderPage } from '@/pages/tables/TableOrderPage'
 import { DashboardPage } from '@/pages/dashboard/DashboardPage'
 import { MenuPage } from '@/pages/menu/MenuPage'
+import { NotificationsPage } from '@/pages/notifications/NotificationsPage'
 import { ProfilePage } from '@/pages/profile/ProfilePage'
 import { AdminEmployeesPage } from '@/pages/admin/AdminEmployeesPage'
 import { AdminAnalyticsPage } from '@/pages/admin/AdminAnalyticsPage'
@@ -26,6 +27,7 @@ export const router = createBrowserRouter([
       { index: true, element: <ProtectedRoute><OrdersPage /></ProtectedRoute> },
       { path: 'dashboard', element: <ProtectedRoute><DashboardPage /></ProtectedRoute> },
       { path: 'menu', element: <ProtectedRoute><MenuPage /></ProtectedRoute> },
+      { path: 'notifications', element: <ProtectedRoute><NotificationsPage /></ProtectedRoute> },
       { path: 'profile', element: <ProtectedRoute><ProfilePage /></ProtectedRoute> },
       {
         path: 'admin',
