@@ -8,7 +8,7 @@ import {
   type SetStateAction,
 } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Camera, Eye, EyeOff, LogOut } from 'lucide-react'
+import { Bell, Camera, ChevronRight, Eye, EyeOff, LogOut } from 'lucide-react'
 
 import { UserNiceAvatar } from '@/components/UserNiceAvatar'
 import { Badge } from '@/components/ui/badge'
@@ -22,6 +22,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/features/auth/useAuth'
+import { pushNotificationsApi } from '@/features/notifications/api/pushNotificationsApi'
+import { useUnreadNotificationsCount } from '@/features/notifications/hooks/useUnreadNotificationsCount'
 import { supabase } from '@/shared/api/supabase'
 
 const roleLabels: Record<string, string> = {
@@ -150,6 +152,12 @@ export const ProfilePage = () => {
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [isPushSupported, setIsPushSupported] = useState(false)
+  const [pushPermission, setPushPermission] =
+    useState<NotificationPermission>('default')
+  const [isPushSubscribed, setIsPushSubscribed] = useState(false)
+  const [isPushSaving, setIsPushSaving] = useState(false)
+  const [pushError, setPushError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!avatarPreview) {
@@ -160,6 +168,25 @@ export const ProfilePage = () => {
       URL.revokeObjectURL(avatarPreview)
     }
   }, [avatarPreview])
+
+  useEffect(() => {
+    const supported = pushNotificationsApi.isPushSupported()
+
+    setIsPushSupported(supported)
+
+    if (!supported) {
+      return
+    }
+
+    setPushPermission(pushNotificationsApi.getNotificationPermission())
+
+    pushNotificationsApi
+      .getExistingSubscription()
+      .then((subscription) => setIsPushSubscribed(Boolean(subscription)))
+      .catch((err) => {
+        console.error('ProfilePage getExistingSubscription error:', err)
+      })
+  }, [])
 
   const fallbackName = useMemo(() => {
     const seed = user?.id || user?.email || 'CheckMate'
@@ -173,6 +200,9 @@ export const ProfilePage = () => {
   const grade = getLabel(profile?.grade, gradeLabels, 'Новичок')
   const avatarSeed = user?.id || user?.email || savedFullName.trim() || fallbackName
   const avatarImageUrl = avatarPreview ?? savedAvatarUrl
+  const { count: unreadNotificationsCount } = useUnreadNotificationsCount(
+    user?.id
+  )
 
   const resetEditState = () => {
     const currentName = splitFullName(savedFullName)
@@ -339,6 +369,64 @@ export const ProfilePage = () => {
     await signOut()
     navigate('/login')
   }
+
+  const handleEnablePush = async () => {
+    if (!user) {
+      return
+    }
+
+    try {
+      setIsPushSaving(true)
+      setPushError(null)
+      await pushNotificationsApi.subscribeToPush(user.id)
+      setPushPermission(pushNotificationsApi.getNotificationPermission())
+      setIsPushSubscribed(true)
+    } catch (err) {
+      console.error('ProfilePage handleEnablePush error:', err)
+      setPushPermission(pushNotificationsApi.getNotificationPermission())
+      setPushError(
+        err instanceof Error
+          ? err.message
+          : 'Не удалось включить push-уведомления'
+      )
+    } finally {
+      setIsPushSaving(false)
+    }
+  }
+
+  const handleDisablePush = async () => {
+    if (!user) {
+      return
+    }
+
+    try {
+      setIsPushSaving(true)
+      setPushError(null)
+      await pushNotificationsApi.unsubscribeFromPush(user.id)
+      setIsPushSubscribed(false)
+      setPushPermission(pushNotificationsApi.getNotificationPermission())
+    } catch (err) {
+      console.error('ProfilePage handleDisablePush error:', err)
+      setPushError(
+        err instanceof Error
+          ? err.message
+          : 'Не удалось отключить push-уведомления'
+      )
+    } finally {
+      setIsPushSaving(false)
+    }
+  }
+
+  const isAppleMobile =
+    typeof navigator !== 'undefined' &&
+    /iPad|iPhone|iPod/.test(navigator.userAgent)
+  const isStandalone =
+    typeof window !== 'undefined' &&
+    (window.matchMedia('(display-mode: standalone)').matches ||
+      ('standalone' in navigator &&
+        (navigator as Navigator & { standalone?: boolean }).standalone === true))
+  const shouldShowIosHint =
+    isAppleMobile && (!isPushSupported || !isStandalone)
 
   return (
     <div className="container mx-auto p-4">
@@ -509,6 +597,97 @@ export const ProfilePage = () => {
                     Управление сотрудниками
                   </Button>
                 )}
+
+                <button
+                  type="button"
+                  className="flex min-h-14 w-full items-center gap-3 rounded-3xl border border-white/70 bg-white/80 px-4 py-3 text-left shadow-sm transition-colors hover:bg-muted/60"
+                  onClick={() => navigate('/notifications')}
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <Bell className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold">
+                      Уведомления
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      Личные события и обновления приложения
+                    </span>
+                  </span>
+                  {unreadNotificationsCount > 0 && (
+                    <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-semibold text-white">
+                      {unreadNotificationsCount > 99
+                        ? '99+'
+                        : unreadNotificationsCount}
+                    </span>
+                  )}
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </button>
+
+                <div className="rounded-3xl border border-white/70 bg-white/80 px-4 py-3 text-left shadow-sm">
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+                      <Bell className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold">
+                        Push-уведомления
+                      </p>
+                      {!isPushSupported ? (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Браузер не поддерживает push-уведомления
+                        </p>
+                      ) : pushPermission === 'denied' ? (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Уведомления заблокированы в настройках браузера
+                        </p>
+                      ) : pushPermission === 'granted' && isPushSubscribed ? (
+                        <p className="mt-1 text-xs text-green-700">
+                          Уведомления включены
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Получайте уведомления о переданных заказах даже вне приложения
+                        </p>
+                      )}
+
+                      {shouldShowIosHint && (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          На iPhone добавьте приложение на экран Домой, затем откройте его как приложение и включите уведомления.
+                        </p>
+                      )}
+
+                      {pushError && (
+                        <p className="mt-2 text-xs text-red-600">{pushError}</p>
+                      )}
+
+                      {isPushSupported &&
+                        pushPermission !== 'denied' &&
+                        (pushPermission === 'granted' && isPushSubscribed ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="mt-3 min-h-10 rounded-2xl"
+                            disabled={isPushSaving}
+                            onClick={handleDisablePush}
+                          >
+                            {isPushSaving ? 'Отключение...' : 'Отключить'}
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            className="mt-3 min-h-10 rounded-2xl"
+                            disabled={isPushSaving}
+                            onClick={handleEnablePush}
+                          >
+                            {isPushSaving
+                              ? 'Включение...'
+                              : 'Включить уведомления'}
+                          </Button>
+                        ))}
+                    </div>
+                  </div>
+                </div>
 
                 <div className="grid gap-2 sm:grid-cols-2">
                   <Button

@@ -1,15 +1,42 @@
+import { useCallback, useEffect, useState } from 'react'
 import { Outlet, Link, NavLink, useLocation } from 'react-router-dom'
 import { BarChart3, ClipboardList, User, UtensilsCrossed } from 'lucide-react'
 import { UserNiceAvatar } from '@/components/UserNiceAvatar'
 import { useAuth } from '@/features/auth/useAuth'
+import type { AppNotification } from '@/features/notifications/api/notificationsApi'
+import { useUnreadNotificationsCount } from '@/features/notifications/hooks/useUnreadNotificationsCount'
 
 export const RootLayout = () => {
   const { user, profile } = useAuth()
   const location = useLocation()
+  const [notificationToast, setNotificationToast] =
+    useState<AppNotification | null>(null)
   const avatarSeed = user?.id || user?.email || profile?.full_name || 'CheckMate'
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup'
   const isAdminPage = location.pathname.startsWith('/admin')
   const showAppChrome = !isAuthPage && !isAdminPage
+  const handleNewNotification = useCallback((notification: AppNotification) => {
+    setNotificationToast(notification)
+  }, [])
+  const { count: unreadNotificationsCount } = useUnreadNotificationsCount(
+    user?.id,
+    {
+      realtime: Boolean(user && showAppChrome),
+      onNewNotification: handleNewNotification,
+    }
+  )
+
+  useEffect(() => {
+    if (!notificationToast) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setNotificationToast(null)
+    }, 4000)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [notificationToast])
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -61,6 +88,21 @@ export const RootLayout = () => {
         <Outlet />
       </main>
 
+      {notificationToast && showAppChrome && (
+        <Link
+          to="/notifications"
+          className="fixed inset-x-3 top-3 z-[120] rounded-3xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 shadow-lg backdrop-blur md:left-auto md:right-4 md:w-80"
+          onClick={() => setNotificationToast(null)}
+        >
+          <span className="block text-xs font-medium uppercase tracking-wide">
+            Новое уведомление
+          </span>
+          <span className="mt-1 block font-semibold">
+            {notificationToast.title}
+          </span>
+        </Link>
+      )}
+
       {user && showAppChrome && (
         <nav className="fixed inset-x-3 bottom-3 z-50 rounded-3xl border border-white/70 bg-background/80 px-2 py-2 shadow-lg backdrop-blur-xl md:hidden">
           <div className="grid grid-cols-4 gap-1">
@@ -98,15 +140,24 @@ export const RootLayout = () => {
               }
               aria-label="Профиль"
             >
-              <span className="profile-avatar flex h-9 w-9 items-center justify-center overflow-hidden rounded-full ring-1 ring-border">
-                {profile?.avatar_url ? (
-                  <img
-                    src={profile.avatar_url}
-                    alt="Профиль"
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <UserNiceAvatar seed={avatarSeed} size={36} />
+              <span className="profile-avatar relative flex h-9 w-9 items-center justify-center rounded-full">
+                <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full ring-1 ring-border">
+                  {profile?.avatar_url ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt="Профиль"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <UserNiceAvatar seed={avatarSeed} size={36} />
+                  )}
+                </span>
+                {unreadNotificationsCount > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-background">
+                    {unreadNotificationsCount > 9
+                      ? '9+'
+                      : unreadNotificationsCount}
+                  </span>
                 )}
               </span>
             </NavLink>
