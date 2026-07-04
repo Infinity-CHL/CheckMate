@@ -3,6 +3,31 @@ import type { Order, OrderItem, CreateOrderData, CreateOrderItemData } from '@/e
 import { ORDER_ITEM_STATUS, type OrderItemStatus } from '@/entities/order/constants/order-item.constants'
 import { ORDER_STATUS } from '@/entities/order/constants/order.constants'
 
+export type TransferableUser = {
+  id: string
+  email: string | null
+  full_name: string | null
+  role: string | null
+  grade: string | null
+  is_active?: boolean | null
+}
+
+const ORDER_TRANSFER_RLS_ERROR =
+  'Нет прав на передачу заказа. Нужно обновить RLS policy для orders.'
+
+const isRlsError = (error: { code?: string; message?: string }) => {
+  const message = error.message?.toLowerCase() ?? ''
+
+  return (
+    error.code === '42501' ||
+    message.includes('row-level security') ||
+    message.includes('permission denied')
+  )
+}
+
+const getTransferableUserName = (user: TransferableUser) =>
+  user.full_name?.trim() || user.email || 'Сотрудник'
+
 export const ordersApi = {
   async getOrders(waiterId: string): Promise<Order[]> {
     const { data, error } = await supabase
@@ -138,6 +163,53 @@ export const ordersApi = {
       console.error('ordersApi.updateOrderTips update error:', error)
       throw error
     }
+  },
+
+  async getTransferableUsers(
+    currentUserId: string
+  ): Promise<TransferableUser[]> {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .neq('id', currentUserId)
+
+    if (error) {
+      console.error('ordersApi.getTransferableUsers select error:', error)
+      throw error
+    }
+
+    return ((data || []) as TransferableUser[])
+      .filter((user) => user.is_active !== false)
+      .sort((firstUser, secondUser) =>
+        getTransferableUserName(firstUser).localeCompare(
+          getTransferableUserName(secondUser),
+          'ru'
+        )
+      )
+  },
+
+  async transferOrder(
+    orderId: string,
+    targetUserId: string
+  ): Promise<Order> {
+    const { data, error } = await supabase
+      .from('orders')
+      .update({ waiter_id: targetUserId })
+      .eq('id', orderId)
+      .select('*, table:tables(id, number)')
+      .single()
+
+    if (error) {
+      console.error('ordersApi.transferOrder update error:', error)
+
+      if (isRlsError(error)) {
+        throw new Error(ORDER_TRANSFER_RLS_ERROR)
+      }
+
+      throw error
+    }
+
+    return data
   },
 
   async closeOrder(orderId: string): Promise<void> {
