@@ -15,6 +15,9 @@ type OrderReceiptItemsProps = {
   onQuantityChange: (itemKey: string, quantity: number) => void
   onNoteChange: (itemKey: string, note: string) => void
   onRemoveItem: (itemKey: string) => void
+  onEditModifiers?: (itemKey: string) => void
+  canEditModifiers?: (item: LocalOrderItem) => boolean
+  readOnly?: boolean
 }
 
 const formatAmount = (value: number) =>
@@ -22,9 +25,47 @@ const formatAmount = (value: number) =>
     maximumFractionDigits: 0,
   }).format(value)
 
+const getModifierOptionId = (
+  modifier: NonNullable<LocalOrderItem['selectedModifiers']>[number]
+) => modifier.optionId ?? modifier.modifier_option_id
+
+const getModifierPrice = (
+  modifier: NonNullable<LocalOrderItem['selectedModifiers']>[number]
+) => modifier.priceDelta ?? modifier.price ?? 0
+
+const getModifierGroups = (modifiers: LocalOrderItem['selectedModifiers']) => {
+  const groupedModifiers = new Map<string, {
+    groupName: string
+    options: string[]
+  }>()
+
+  ;(modifiers ?? []).forEach((modifier) => {
+    const groupName = modifier.groupName ?? modifier.group_name ?? ''
+    const optionName = modifier.optionName ?? modifier.option_name ?? ''
+    const modifierPrice = getModifierPrice(modifier)
+    const optionLabel =
+      modifierPrice > 0
+        ? `${optionName} +${formatAmount(modifierPrice)} ₽`
+        : optionName
+    const groupKey = modifier.groupId ?? modifier.group_id ?? optionName
+    const currentGroup =
+      groupedModifiers.get(groupKey) ?? { groupName, options: [] }
+
+    currentGroup.options.push(optionLabel)
+    groupedModifiers.set(groupKey, currentGroup)
+  })
+
+  return Array.from(groupedModifiers.entries()).map(([key, value]) => ({
+    key,
+    label: value.groupName
+      ? `${value.groupName}: ${value.options.join(', ')}`
+      : value.options.join(', '),
+  }))
+}
+
 const getOrderItemKey = (item: LocalOrderItem) => {
   const modifierKey = (item.selectedModifiers ?? [])
-    .map((modifier) => modifier.optionId)
+    .map((modifier) => getModifierOptionId(modifier))
     .sort()
     .join('|')
 
@@ -40,6 +81,9 @@ export const OrderReceiptItems = ({
   onQuantityChange,
   onNoteChange,
   onRemoveItem,
+  onEditModifiers,
+  canEditModifiers,
+  readOnly = false,
 }: OrderReceiptItemsProps) => {
   const [expandedNotes, setExpandedNotes] = useState<Record<string, boolean>>(
     {}
@@ -69,6 +113,14 @@ export const OrderReceiptItems = ({
           const itemTotal = item.price * item.quantity
           const hasNote = Boolean(item.note?.trim())
           const isNoteExpanded = Boolean(expandedNotes[itemKey])
+          const canEditItemModifiers =
+            !readOnly &&
+            Boolean(onEditModifiers) &&
+            (canEditModifiers?.(item) ??
+              Boolean(
+                item.selectedModifiers?.length ||
+                  item.menuItem.modifier_groups?.length
+              ))
 
           return (
             <div key={itemKey} className="min-w-0 space-y-1.5 p-2">
@@ -84,85 +136,106 @@ export const OrderReceiptItems = ({
                 </div>
               </div>
 
-              <div className="flex min-w-0 items-center justify-between gap-1.5">
-                <Button
-                  type="button"
-                  variant={hasNote ? 'secondary' : 'ghost'}
-                  size="icon-sm"
-                  className="h-6 w-6"
-                  onClick={() => toggleNote(itemKey)}
-                  aria-label={`Комментарий к ${capitalizeFirstLetter(item.menuItem.name)}`}
-                  aria-expanded={isNoteExpanded}
-                  aria-pressed={hasNote}
-                >
-                  <MessageSquareMore className="h-3.5 w-3.5" />
-                </Button>
-
-                <div className="flex min-w-0 items-center gap-1">
-                  <div className="flex shrink-0 items-center border bg-background">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="h-6 w-6"
-                      onClick={() =>
-                        onQuantityChange(itemKey, item.quantity - 1)
-                      }
-                      aria-label={`Уменьшить ${capitalizeFirstLetter(item.menuItem.name)}`}
-                    >
-                      <Minus className="h-3.5 w-3.5" />
-                    </Button>
-                    <div className="min-w-5 px-1 text-center text-xs font-medium tabular-nums">
-                      {item.quantity}
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="h-6 w-6"
-                      onClick={() =>
-                        onQuantityChange(itemKey, item.quantity + 1)
-                      }
-                      aria-label={`Увеличить ${capitalizeFirstLetter(item.menuItem.name)}`}
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-
+              {!readOnly && (
+                <div className="flex min-w-0 items-center justify-between gap-1.5">
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant={hasNote ? 'secondary' : 'ghost'}
                     size="icon-sm"
-                    className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                    onClick={() => onRemoveItem(itemKey)}
-                    aria-label={`Удалить ${capitalizeFirstLetter(item.menuItem.name)}`}
+                    className="h-6 w-6"
+                    onClick={() => toggleNote(itemKey)}
+                    aria-label={`Комментарий к ${capitalizeFirstLetter(item.menuItem.name)}`}
+                    aria-expanded={isNoteExpanded}
+                    aria-pressed={hasNote}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <MessageSquareMore className="h-3.5 w-3.5" />
                   </Button>
-                </div>
-              </div>
 
-              {(item.selectedModifiers ?? []).length > 0 && (
-                <div className="space-y-0.5 text-[11px] leading-snug text-muted-foreground">
-                  {item.selectedModifiers?.map((modifier) => (
-                    <div
-                      key={`${modifier.groupId}:${modifier.optionId}`}
-                      className="flex min-w-0 justify-between gap-2"
-                    >
-                      <span className="min-w-0 truncate">
-                        {modifier.optionName}
-                      </span>
-                      {modifier.priceDelta > 0 && (
-                        <span className="shrink-0 tabular-nums">
-                          +{formatAmount(modifier.priceDelta)} в‚Ѕ
-                        </span>
-                      )}
+                  <div className="flex min-w-0 items-center gap-1">
+                    <div className="flex shrink-0 items-center border bg-background">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="h-6 w-6"
+                        onClick={() =>
+                          onQuantityChange(itemKey, item.quantity - 1)
+                        }
+                        aria-label={`Уменьшить ${capitalizeFirstLetter(item.menuItem.name)}`}
+                      >
+                        <Minus className="h-3.5 w-3.5" />
+                      </Button>
+                      <div className="min-w-5 px-1 text-center text-xs font-medium tabular-nums">
+                        {item.quantity}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="h-6 w-6"
+                        onClick={() =>
+                          onQuantityChange(itemKey, item.quantity + 1)
+                        }
+                        aria-label={`Увеличить ${capitalizeFirstLetter(item.menuItem.name)}`}
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
-                  ))}
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                      onClick={() => onRemoveItem(itemKey)}
+                      aria-label={`Удалить ${capitalizeFirstLetter(item.menuItem.name)}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
               )}
 
-              {isNoteExpanded && (
+              {(item.selectedModifiers ?? []).length > 0 && (
+                <div className="flex flex-wrap items-center gap-1">
+                  {getModifierGroups(item.selectedModifiers).map((modifier) => (
+                    <span
+                      key={modifier.key}
+                      className="inline-flex max-w-full items-center rounded-full bg-blue-50 px-2 py-0.5 text-[11px] leading-snug text-blue-700"
+                    >
+                      <span className="min-w-0 truncate">
+                        {modifier.label}
+                      </span>
+                    </span>
+                  ))}
+                  {canEditItemModifiers && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 rounded-xl px-2 text-[11px] text-blue-700 hover:bg-blue-50"
+                      onClick={() => onEditModifiers?.(itemKey)}
+                    >
+                      Изменить
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {(item.selectedModifiers ?? []).length === 0 &&
+                canEditItemModifiers && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 rounded-xl px-2 text-[11px] text-blue-700 hover:bg-blue-50"
+                    onClick={() => onEditModifiers?.(itemKey)}
+                  >
+                    Настроить
+                  </Button>
+                )}
+
+              {isNoteExpanded && !readOnly && (
                 <Textarea
                   placeholder="Комментарий к позиции"
                   value={item.note ?? ''}

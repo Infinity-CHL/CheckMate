@@ -1,11 +1,14 @@
 export interface ModifierOption {
   id: string
-  modifier_group_id: string
+  group_id: string
   name: string
-  price_delta: number
-  is_active?: boolean | null
+  price: number
+  sort_order?: number | null
   created_at?: string
   updated_at?: string
+  modifier_group_id?: string
+  price_delta?: number
+  is_active?: boolean | null
 }
 
 export interface ModifierGroup {
@@ -18,6 +21,7 @@ export interface ModifierGroup {
   max_selected?: number | null
   is_required?: boolean | null
   sort_order?: number | null
+  options?: ModifierOption[]
   modifier_options?: ModifierOption[]
   created_at?: string
   updated_at?: string
@@ -29,6 +33,11 @@ export interface SelectedModifier {
   optionId: string
   optionName: string
   priceDelta: number
+  group_id?: string
+  group_name?: string
+  modifier_option_id?: string
+  option_name?: string
+  price?: number
 }
 
 export interface MenuItem {

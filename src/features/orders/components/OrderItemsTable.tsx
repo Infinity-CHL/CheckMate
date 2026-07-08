@@ -25,6 +25,40 @@ const formatAmount = (value: number) =>
     maximumFractionDigits: 0,
   }).format(value)
 
+const getModifierPrice = (
+  modifier: NonNullable<OrderItem['selected_modifiers']>[number]
+) => modifier.priceDelta ?? modifier.price ?? 0
+
+const getModifierGroups = (modifiers: OrderItem['selected_modifiers']) => {
+  const groupedModifiers = new Map<string, {
+    groupName: string
+    options: string[]
+  }>()
+
+  ;(modifiers ?? []).forEach((modifier) => {
+    const groupName = modifier.groupName ?? modifier.group_name ?? ''
+    const optionName = modifier.optionName ?? modifier.option_name ?? ''
+    const modifierPrice = getModifierPrice(modifier)
+    const optionLabel =
+      modifierPrice > 0
+        ? `${optionName} +${formatAmount(modifierPrice)} ₽`
+        : optionName
+    const groupKey = modifier.groupId ?? modifier.group_id ?? optionName
+    const currentGroup =
+      groupedModifiers.get(groupKey) ?? { groupName, options: [] }
+
+    currentGroup.options.push(optionLabel)
+    groupedModifiers.set(groupKey, currentGroup)
+  })
+
+  return Array.from(groupedModifiers.entries()).map(([key, value]) => ({
+    key,
+    label: value.groupName
+      ? `${value.groupName}: ${value.options.join(', ')}`
+      : value.options.join(', '),
+  }))
+}
+
 const ItemServedCheckbox = ({
   checked,
   disabled,
@@ -143,6 +177,21 @@ export const OrderItemsTable = ({
                 <p className="mt-1 min-w-0 break-words pl-10 text-xs leading-snug text-muted-foreground">
                   {item.note}
                 </p>
+              )}
+
+              {(item.selected_modifiers ?? []).length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1 pl-10">
+                  {getModifierGroups(item.selected_modifiers).map((modifier) => (
+                    <span
+                      key={modifier.key}
+                      className="inline-flex max-w-full items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs leading-snug text-blue-700"
+                    >
+                      <span className="min-w-0 truncate">
+                        {modifier.label}
+                      </span>
+                    </span>
+                  ))}
+                </div>
               )}
 
               {isAdmin && (

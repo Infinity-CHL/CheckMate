@@ -18,7 +18,7 @@ import { UserNiceAvatar } from '@/components/UserNiceAvatar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { ORDER_STATUS } from '@/entities/order/constants/order.constants'
+import { ORDER_STATUS, isOrderClosed } from '@/entities/order/constants/order.constants'
 import { formatDate } from '@/entities/order/lib/order.utils'
 import { useAuth } from '@/features/auth/useAuth'
 import {
@@ -246,12 +246,15 @@ export const OrderDetailsPage = () => {
   }
 
   const canCloseOrder = order.status === ORDER_STATUS.OPEN
-  const canEditOrder = order.status === ORDER_STATUS.OPEN
+  const isClosedOrder = isOrderClosed(order.status)
+  const canEditOrder = order.status === ORDER_STATUS.OPEN && !isClosedOrder
   const canUpdateOrder = isAdmin && order.status === ORDER_STATUS.OPEN
   const canTransferOrder =
     Boolean(user) &&
     order.status === ORDER_STATUS.OPEN &&
     order.waiter_id === user?.id
+  const canDeleteOrder = order.status === ORDER_STATUS.OPEN
+  const hasMoreActions = canUpdateOrder || canDeleteOrder
   const currentTipsAmount = order.tips_amount ?? 0
   const normalizedTipsValue = Math.max(Number(tipsValue) || 0, 0)
   const isTipsChanged = normalizedTipsValue !== currentTipsAmount
@@ -323,47 +326,51 @@ export const OrderDetailsPage = () => {
                 </Button>
               )}
 
-              <div className="relative z-50">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="icon"
-                  className="h-11 w-11 rounded-2xl"
-                  onClick={() => setShowMoreActions((current) => !current)}
-                  aria-label="Дополнительные действия"
-                >
-                  <MoreHorizontal className="h-5 w-5" />
-                </Button>
+              {hasMoreActions && (
+                <div className="relative z-50">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon"
+                    className="h-10 w-10 rounded-2xl"
+                    onClick={() => setShowMoreActions((current) => !current)}
+                    aria-label="Дополнительные действия"
+                  >
+                    <MoreHorizontal className="h-5 w-5" />
+                  </Button>
 
-                {showMoreActions && (
-                  <div className="absolute right-0 top-12 z-[120] w-52 rounded-2xl border border-border/80 bg-background p-1.5 shadow-xl">
-                    {canUpdateOrder && (
-                      <button
-                        type="button"
-                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-destructive hover:bg-destructive/10"
-                        onClick={() => {
-                          setShowMoreActions(false)
-                          updateStatus(ORDER_STATUS.CANCELLED)
-                        }}
-                      >
-                        <XCircle className="h-4 w-4" />
-                        Отменить заказ
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-destructive hover:bg-destructive/10"
-                      onClick={() => {
-                        setShowMoreActions(false)
-                        setShowDeleteConfirmation(true)
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Удалить заказ
-                    </button>
-                  </div>
-                )}
-              </div>
+                  {showMoreActions && (
+                    <div className="absolute right-0 top-12 z-[120] w-[min(13rem,calc(100vw-2rem))] rounded-2xl border border-border/80 bg-background p-1.5 shadow-xl">
+                      {canUpdateOrder && (
+                        <button
+                          type="button"
+                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-destructive hover:bg-destructive/10"
+                          onClick={() => {
+                            setShowMoreActions(false)
+                            updateStatus(ORDER_STATUS.CANCELLED)
+                          }}
+                        >
+                          <XCircle className="h-4 w-4" />
+                          Отменить заказ
+                        </button>
+                      )}
+                      {canDeleteOrder && (
+                        <button
+                          type="button"
+                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-destructive hover:bg-destructive/10"
+                          onClick={() => {
+                            setShowMoreActions(false)
+                            setShowDeleteConfirmation(true)
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Удалить заказ
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -377,7 +384,7 @@ export const OrderDetailsPage = () => {
               items={items}
               discountPercent={discountPercent}
               totalAmount={order.total_amount}
-              onRemoveItem={isAdmin ? removeItem : undefined}
+              onRemoveItem={isAdmin && canEditOrder ? removeItem : undefined}
               onUpdateItemStatus={canEditOrder ? updateItemStatus : undefined}
               isReadOnly={!canEditOrder}
               isAdmin={isAdmin}

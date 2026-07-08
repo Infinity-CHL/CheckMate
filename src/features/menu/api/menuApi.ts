@@ -6,6 +6,7 @@ import type {
 } from '@/entities/menu/model/menu-item.model'
 
 type ModifierOptionRow = ModifierOption & {
+  group_id: string
   price?: number | null
 }
 
@@ -13,12 +14,14 @@ const normalizeModifierOption = (
   option: ModifierOptionRow
 ): ModifierOption => ({
   id: option.id,
-  modifier_group_id: option.modifier_group_id,
+  group_id: option.group_id,
   name: option.name,
-  price_delta: option.price_delta ?? option.price ?? 0,
-  is_active: option.is_active,
+  price: option.price ?? 0,
+  sort_order: option.sort_order,
   created_at: option.created_at,
   updated_at: option.updated_at,
+  modifier_group_id: option.group_id,
+  price_delta: option.price ?? 0,
 })
 
 export const getMenuItems = async (): Promise<MenuItem[]> => {
@@ -43,15 +46,18 @@ export const getModifiersForMenuItem = async (
 ): Promise<ModifierGroup[]> => {
   const { data: groupsData, error: groupsError } = await supabase
     .from('modifier_groups')
-    .select('*')
+    .select('id, menu_item_id, name, is_required, max_select, sort_order, created_at')
     .eq('menu_item_id', menuItemId)
+    .order('sort_order', { ascending: true, nullsFirst: false })
 
-  if (groupsError) throw groupsError
+  if (groupsError) {
+    if (import.meta.env.DEV) {
+      console.error('[modifiers] fetch error', groupsError)
+    }
+    throw groupsError
+  }
 
-  const groups = ((groupsData || []) as ModifierGroup[]).sort(
-    (firstGroup, secondGroup) =>
-      (firstGroup.sort_order ?? 0) - (secondGroup.sort_order ?? 0)
-  )
+  const groups = (groupsData || []) as ModifierGroup[]
   const groupIds = groups.map((group) => group.id)
 
   if (groupIds.length === 0) {
@@ -60,25 +66,31 @@ export const getModifiersForMenuItem = async (
 
   const { data: optionsData, error: optionsError } = await supabase
     .from('modifier_options')
-    .select('*')
-    .in('modifier_group_id', groupIds)
-    .order('created_at', { ascending: true })
+    .select('id, group_id, name, price, sort_order, created_at')
+    .in('group_id', groupIds)
+    .order('sort_order', { ascending: true, nullsFirst: false })
 
-  if (optionsError) throw optionsError
+  if (optionsError) {
+    if (import.meta.env.DEV) {
+      console.error('[modifiers] fetch error', optionsError)
+    }
+    throw optionsError
+  }
 
   const optionsByGroupId = new Map<string, ModifierOption[]>()
 
   ;((optionsData || []) as ModifierOptionRow[]).forEach((option) => {
     const normalizedOption = normalizeModifierOption(option)
     const currentOptions =
-      optionsByGroupId.get(normalizedOption.modifier_group_id) ?? []
+      optionsByGroupId.get(normalizedOption.group_id) ?? []
 
     currentOptions.push(normalizedOption)
-    optionsByGroupId.set(normalizedOption.modifier_group_id, currentOptions)
+    optionsByGroupId.set(normalizedOption.group_id, currentOptions)
   })
 
   return groups.map((group) => ({
     ...group,
+    options: optionsByGroupId.get(group.id) ?? [],
     modifier_options: optionsByGroupId.get(group.id) ?? [],
   }))
 }
