@@ -4,6 +4,16 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      notify_users:
+        description: "Send user notifications"
+        required: false
+        default: "false"
+      test_title:
+        description: "Test release title"
+        required: false
+        default: "Test release"
 
 permissions:
   contents: write
@@ -47,4 +57,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RELEASE_FORCE_NOTIFY: ${{ github.event_name == 'workflow_dispatch' && inputs.notify_users == 'true' }}
+          RELEASE_TEST_TITLE: ${{ inputs.test_title }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
         run: node scripts/publish-release-update.mjs
