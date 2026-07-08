@@ -54,14 +54,79 @@ const getLatestChangelogSection = (version) => {
   }
 }
 
+const getCommitMessagesSince = (previousTag) => {
+  const args = previousTag
+    ? ['log', `${previousTag}..HEAD`, '--format=%B%n---CHECKMATE-COMMIT---']
+    : ['log', '--format=%B%n---CHECKMATE-COMMIT---']
+
+  try {
+    return runGit(args)
+  } catch {
+    return ''
+  }
+}
+
+const hasNotifyMarker = (value) => /\[notify\]/i.test(value)
+
+const publishAppUpdate = async ({ version, releaseType, title, body }) => {
+  const supabaseUrl = process.env.SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error(
+      'SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required to publish release notifications'
+    )
+  }
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  })
+
+  const { data, error } = await supabase.rpc('publish_app_update', {
+    p_version: version,
+    p_type: releaseType,
+    p_title: title,
+    p_body: body,
+  })
+
+  if (error) {
+    console.error('[release-update] Supabase RPC failed:', error)
+    throw error
+  }
+
+  console.log('[release-update] Published app update notification:', {
+    appUpdateId: data,
+    version,
+    releaseType,
+  })
+}
+
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8'))
 const version = packageJson.version
 const releaseTag = `v${version}`
+const forceNotify = process.env.RELEASE_FORCE_NOTIFY === 'true'
 const tagsAtHead = runGit(['tag', '--points-at', 'HEAD'])
   .split(/\r?\n/)
   .filter(Boolean)
 
 if (!tagsAtHead.includes(releaseTag)) {
+  if (forceNotify) {
+    const manualVersion = `manual-${process.env.GITHUB_RUN_NUMBER || Date.now()}`
+    const title = process.env.RELEASE_TEST_TITLE || 'Test release'
+
+    await publishAppUpdate({
+      version: manualVersion,
+      releaseType: 'patch',
+      title,
+      body:
+        'Тестовое уведомление релизной автоматизации. Semantic-release не создавал новый релиз для этого запуска.',
+    })
+    process.exit(0)
+  }
+
   console.log('[release-update] No release tag on HEAD, skipping Supabase RPC')
   process.exit(0)
 }
@@ -82,36 +147,25 @@ const body =
   getLatestChangelogSection(version) ||
   `Вышла новая версия CheckMate ${version}. Откройте раздел обновлений, чтобы посмотреть детали.`
 const title = `CheckMate ${version}`
-const supabaseUrl = process.env.SUPABASE_URL
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+const commitMessages = getCommitMessagesSince(previousTag)
+const shouldNotifyUsers =
+  forceNotify ||
+  releaseType === 'major' ||
+  releaseType === 'minor' ||
+  (releaseType === 'patch' &&
+    (hasNotifyMarker(body) || hasNotifyMarker(commitMessages)))
 
-if (!supabaseUrl || !serviceRoleKey) {
-  throw new Error(
-    'SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required to publish release notifications'
-  )
+if (!shouldNotifyUsers) {
+  console.log('[release-update] Skip user notification for patch release', {
+    version,
+    releaseType,
+  })
+  process.exit(0)
 }
 
-const supabase = createClient(supabaseUrl, serviceRoleKey, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-  },
-})
-
-const { data, error } = await supabase.rpc('publish_app_update', {
-  p_version: version,
-  p_type: releaseType,
-  p_title: title,
-  p_body: body,
-})
-
-if (error) {
-  console.error('[release-update] Supabase RPC failed:', error)
-  throw error
-}
-
-console.log('[release-update] Published app update notification:', {
-  appUpdateId: data,
+await publishAppUpdate({
   version,
   releaseType,
+  title,
+  body,
 })
