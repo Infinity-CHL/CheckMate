@@ -2,6 +2,7 @@ import { supabase } from '@/shared/api/supabase'
 import type { Order, OrderItem, CreateOrderData, CreateOrderItemData } from '@/entities/order/model/order.model'
 import { ORDER_ITEM_STATUS, type OrderItemStatus } from '@/entities/order/constants/order-item.constants'
 import { ORDER_STATUS } from '@/entities/order/constants/order.constants'
+import { getOrderItemModifiers } from '@/features/table-order/api/orderItemModifiersApi'
 
 export type TransferableUser = {
   id: string
@@ -111,7 +112,18 @@ export const ordersApi = {
 
     if (itemsError) throw itemsError
 
-    return { order, items: items || [] }
+    const orderItems = (items || []) as OrderItem[]
+    const modifiersByOrderItemId = await getOrderItemModifiers(
+      orderItems.map((item) => item.id)
+    )
+
+    return {
+      order,
+      items: orderItems.map((item) => ({
+        ...item,
+        selected_modifiers: modifiersByOrderItemId[item.id] ?? [],
+      })),
+    }
   },
 
   async createOrder(waiterId: string, data: CreateOrderData): Promise<Order> {

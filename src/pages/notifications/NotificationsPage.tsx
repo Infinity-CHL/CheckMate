@@ -32,6 +32,10 @@ const getNotificationTypeLabel = (type: string) => {
     return 'Заказ'
   }
 
+  if (type === 'app_update') {
+    return 'Обновление'
+  }
+
   return type
 }
 
@@ -39,10 +43,24 @@ const getUpdateTypeLabel = (type: string) => {
   const labels: Record<string, string> = {
     news: 'Новость',
     patch: 'Патч',
+    minor: 'Обновление',
+    major: 'Важное',
     version: 'Версия',
   }
 
   return labels[type] ?? type
+}
+
+const getNotificationBadgeLabel = (notification: AppNotification) => {
+  if (notification.type !== 'app_update') {
+    return getNotificationTypeLabel(notification.type)
+  }
+
+  const updateType = notification.payload?.type
+
+  return typeof updateType === 'string'
+    ? getUpdateTypeLabel(updateType)
+    : getNotificationTypeLabel(notification.type)
 }
 
 export const NotificationsPage = () => {
@@ -105,6 +123,10 @@ export const NotificationsPage = () => {
 
       if (notification.type === 'order_transfer' && notification.order_id) {
         navigate(`/orders/${notification.order_id}`)
+      }
+
+      if (notification.type === 'app_update') {
+        setActiveTab('updates')
       }
     } catch (err) {
       console.error('NotificationsPage notification click error:', err)
@@ -233,7 +255,7 @@ export const NotificationsPage = () => {
 
                         <div className="mt-3 flex flex-wrap items-center gap-2">
                           <Badge variant={isUnread ? 'default' : 'secondary'}>
-                            {getNotificationTypeLabel(notification.type)}
+                            {getNotificationBadgeLabel(notification)}
                           </Badge>
                           {notification.table_number && (
                             <Badge variant="outline">

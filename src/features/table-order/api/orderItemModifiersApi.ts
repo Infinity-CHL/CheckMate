@@ -14,13 +14,23 @@ type OrderItemModifierRow = {
 }
 
 type ModifierOptionRow = ModifierOption & {
+  group_id: string
   price?: number | null
 }
 
 const normalizePriceDelta = (
   row: OrderItemModifierRow,
   option?: ModifierOptionRow
-) => row.price ?? row.price_delta ?? option?.price_delta ?? option?.price ?? 0
+) => row.price ?? row.price_delta ?? option?.price ?? option?.price_delta ?? 0
+
+const getModifierOptionGroupId = (option: ModifierOptionRow) =>
+  option.group_id ?? option.modifier_group_id
+
+const getSelectedModifierOptionId = (modifier: SelectedModifier) =>
+  modifier.optionId ?? modifier.modifier_option_id
+
+const getSelectedModifierPrice = (modifier: SelectedModifier) =>
+  modifier.priceDelta ?? modifier.price ?? 0
 
 export const insertOrderItemModifiers = async (
   orderItemId: string,
@@ -35,8 +45,8 @@ export const insertOrderItemModifiers = async (
     .insert(
       modifiers.map((modifier) => ({
         order_item_id: orderItemId,
-        modifier_option_id: modifier.optionId,
-        price: modifier.priceDelta,
+        modifier_option_id: getSelectedModifierOptionId(modifier),
+        price: getSelectedModifierPrice(modifier),
       }))
     )
 
@@ -92,7 +102,7 @@ export const getOrderItemModifiers = async (
 
   const { data: optionsData, error: optionsError } = await supabase
     .from('modifier_options')
-    .select('*')
+    .select('id, group_id, name, price, sort_order, created_at')
     .in('id', optionIds)
 
   if (optionsError) {
@@ -103,12 +113,12 @@ export const getOrderItemModifiers = async (
   const options = (optionsData || []) as ModifierOptionRow[]
   const optionsById = new Map(options.map((option) => [option.id, option]))
   const groupIds = Array.from(
-    new Set(options.map((option) => option.modifier_group_id))
-  )
+    new Set(options.map((option) => getModifierOptionGroupId(option)))
+  ).filter(Boolean)
 
   const { data: groupsData, error: groupsError } = await supabase
     .from('modifier_groups')
-    .select('*')
+    .select('id, menu_item_id, name, is_required, max_select, sort_order, created_at')
     .in('id', groupIds)
 
   if (groupsError) {
@@ -127,15 +137,23 @@ export const getOrderItemModifiers = async (
       return acc
     }
 
-    const group = groupsById.get(option.modifier_group_id)
+    const groupId = getModifierOptionGroupId(option)
+    const group = groupsById.get(groupId)
     const currentModifiers = acc[row.order_item_id] ?? []
 
+    const priceDelta = normalizePriceDelta(row, option)
+
     currentModifiers.push({
-      groupId: option.modifier_group_id,
+      groupId,
       groupName: group?.name ?? '',
       optionId: option.id,
       optionName: option.name,
-      priceDelta: normalizePriceDelta(row, option),
+      priceDelta,
+      group_id: groupId,
+      group_name: group?.name ?? '',
+      modifier_option_id: option.id,
+      option_name: option.name,
+      price: priceDelta,
     })
     acc[row.order_item_id] = currentModifiers
 

@@ -10,6 +10,7 @@ export type AppNotification = {
   order_id: string | null
   table_number: number | null
   payload: Record<string, unknown> | null
+  app_update_id?: string | null
   read_at: string | null
   created_at: string
 }

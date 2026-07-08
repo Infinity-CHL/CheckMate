@@ -17,3 +17,9 @@ export const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
   [ORDER_STATUS.CLOSED]: 'bg-gray-500 hover:bg-gray-600',
   [ORDER_STATUS.CANCELLED]: 'bg-red-500 hover:bg-red-600',
 }
+
+export const isOrderClosed = (status: string | null | undefined) => {
+  const normalizedStatus = status?.toLowerCase()
+
+  return normalizedStatus === 'closed' || normalizedStatus === 'completed'
+}

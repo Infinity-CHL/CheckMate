@@ -8,7 +8,11 @@ import {
   normalizeOrderItemStatus,
   type OrderItemStatus,
 } from '@/entities/order/constants/order-item.constants'
-import { insertOrderItemModifiers } from '@/features/table-order/api/orderItemModifiersApi'
+import {
+  deleteOrderItemModifiers,
+  getOrderItemModifiers,
+  insertOrderItemModifiers,
+} from '@/features/table-order/api/orderItemModifiersApi'
 
 export type TableOrderStatus = 'open' | 'closed' | 'cancelled'
 
@@ -98,6 +102,7 @@ export const getOrderItems = async (
     .from('order_items')
     .select('*')
     .eq('order_id', orderId)
+    .order('created_at', { ascending: true })
 
   if (error) {
     console.error('getOrderItems select error:', error)
@@ -106,6 +111,9 @@ export const getOrderItems = async (
 
   const orderItemRows = (rows || []) as OrderItemRow[]
   const menuItemIds = orderItemRows.map((item) => item.menu_item_id)
+  const modifiersByOrderItemId = await getOrderItemModifiers(
+    orderItemRows.map((item) => item.id)
+  )
 
   if (menuItemIds.length === 0) {
     return []
@@ -139,6 +147,7 @@ export const getOrderItems = async (
       price: item.price,
       note: item.note,
       status: normalizeOrderItemStatus(item.status),
+      selectedModifiers: modifiersByOrderItemId[item.id] ?? [],
     }]
   })
 }
@@ -168,16 +177,13 @@ export const saveOrderItems = async (
   const currentItemIds = new Set(
     items.flatMap((item) => (item.id ? [item.id] : []))
   )
-  const currentMenuItemIds = new Set(
-    items.flatMap((item) => (!item.id ? [item.menuItem.id] : []))
-  )
   const itemsToDelete = existingItems.filter(
-    (item) =>
-      !currentItemIds.has(item.id) &&
-      !currentMenuItemIds.has(item.menu_item_id)
+    (item) => !currentItemIds.has(item.id)
   )
 
   if (itemsToDelete.length > 0) {
+    await deleteOrderItemModifiers(itemsToDelete.map((item) => item.id))
+
     const { error: deleteError } = await supabase
       .from('order_items')
       .delete()
@@ -207,6 +213,12 @@ export const saveOrderItems = async (
         console.error('saveOrderItems update error:', updateError)
         throw updateError
       }
+
+      await deleteOrderItemModifiers([existingItem.id])
+      await insertOrderItemModifiers(
+        existingItem.id,
+        item.selectedModifiers ?? []
+      )
       continue
     }
 

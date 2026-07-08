@@ -34,6 +34,7 @@ import {
 } from '@/features/table-order/lib/orderDraftStorage'
 
 const DISCOUNT_OPTIONS = [5, 10, 20]
+type ModifierSheetMode = 'add' | 'edit'
 
 const formatAmount = (value: number) =>
   new Intl.NumberFormat('ru-RU', {
@@ -43,15 +44,18 @@ const formatAmount = (value: number) =>
 const getModifierGroupMaxSelect = (group: ModifierGroup) =>
   group.max_select ?? group.max_selected ?? 1
 
-const getModifierGroupMinSelect = (group: ModifierGroup) =>
-  group.min_select ?? group.min_selected ?? 0
+const isModifierGroupRequired = (group: ModifierGroup) => Boolean(group.is_required)
 
-const isModifierGroupRequired = (group: ModifierGroup) =>
-  Boolean(group.is_required) || getModifierGroupMinSelect(group) > 0
+const getModifierGroupOptions = (group: ModifierGroup) =>
+  group.options ?? group.modifier_options ?? []
+
+const getModifierOptionPrice = (
+  option: NonNullable<ModifierGroup['modifier_options']>[number]
+) => option.price ?? option.price_delta ?? 0
 
 const getOrderItemKey = (item: LocalOrderItem) => {
   const modifierKey = (item.selectedModifiers ?? [])
-    .map((modifier) => modifier.optionId)
+    .map((modifier) => modifier.optionId ?? modifier.modifier_option_id)
     .sort()
     .join('|')
 
@@ -60,12 +64,26 @@ const getOrderItemKey = (item: LocalOrderItem) => {
 
 const getSelectedModifiersKey = (menuItemId: string, modifiers: SelectedModifier[]) => {
   const modifierKey = modifiers
-    .map((modifier) => modifier.optionId)
+    .map((modifier) => modifier.optionId ?? modifier.modifier_option_id)
     .sort()
     .join('|')
 
   return modifierKey ? `${menuItemId}:${modifierKey}` : menuItemId
 }
+
+const getSelectedModifierGroupOptions = (modifiers: SelectedModifier[] = []) =>
+  modifiers.reduce<Record<string, string[]>>((acc, modifier) => {
+    const groupId = modifier.groupId ?? modifier.group_id
+    const optionId = modifier.optionId ?? modifier.modifier_option_id
+
+    if (!groupId || !optionId) {
+      return acc
+    }
+
+    acc[groupId] = [...(acc[groupId] ?? []), optionId]
+
+    return acc
+  }, {})
 
 export const TableOrderPage = () => {
   const { tableId } = useParams<{ tableId: string }>()
@@ -78,6 +96,11 @@ export const TableOrderPage = () => {
   const [discountPercent, setDiscountPercent] = useState(0)
   const [search, setSearch] = useState('')
   const [modifierMenuItem, setModifierMenuItem] = useState<MenuItem | null>(null)
+  const [modifierSheetMode, setModifierSheetMode] =
+    useState<ModifierSheetMode>('add')
+  const [editingOrderItemKey, setEditingOrderItemKey] = useState<string | null>(
+    null
+  )
   const [modifierGroupsCache, setModifierGroupsCache] = useState<
     Record<string, ModifierGroup[]>
   >({})
@@ -123,9 +146,10 @@ export const TableOrderPage = () => {
 
     return (modifierMenuItem.modifier_groups ?? []).flatMap((group) => {
       const selectedOptionIds = selectedModifierOptions[group.id] ?? []
+      const options = getModifierGroupOptions(group)
 
       return selectedOptionIds.flatMap((optionId) => {
-        const option = group.modifier_options?.find(
+        const option = options.find(
           (modifierOption) => modifierOption.id === optionId
         )
 
@@ -138,7 +162,12 @@ export const TableOrderPage = () => {
           groupName: group.name,
           optionId: option.id,
           optionName: option.name,
-          priceDelta: option.price_delta ?? 0,
+          priceDelta: getModifierOptionPrice(option),
+          group_id: group.id,
+          group_name: group.name,
+          modifier_option_id: option.id,
+          option_name: option.name,
+          price: getModifierOptionPrice(option),
         }]
       })
     })
@@ -146,7 +175,7 @@ export const TableOrderPage = () => {
   const modifierItemPrice = modifierMenuItem
     ? modifierMenuItem.price +
       selectedModifiers.reduce(
-        (total, modifier) => total + modifier.priceDelta,
+        (total, modifier) => total + (modifier.priceDelta ?? modifier.price ?? 0),
         0
       )
     : 0
@@ -267,7 +296,7 @@ export const TableOrderPage = () => {
   ) => {
     const itemKey = getSelectedModifiersKey(menuItem.id, selectedModifiersValue)
     const modifiersAmount = selectedModifiersValue.reduce(
-      (total, modifier) => total + modifier.priceDelta,
+      (total, modifier) => total + (modifier.priceDelta ?? modifier.price ?? 0),
       0
     )
     const itemPrice = menuItem.price + modifiersAmount
@@ -299,12 +328,65 @@ export const TableOrderPage = () => {
     setSearch('')
   }
 
+  const updateOrderItemModifiers = (
+    itemKey: string,
+    selectedModifiersValue: SelectedModifier[]
+  ) => {
+    setOrderItems((currentItems) => {
+      const targetItem = currentItems.find(
+        (item) => getOrderItemKey(item) === itemKey
+      )
+
+      if (!targetItem) {
+        return currentItems
+      }
+
+      const modifiersAmount = selectedModifiersValue.reduce(
+        (total, modifier) => total + (modifier.priceDelta ?? modifier.price ?? 0),
+        0
+      )
+      const updatedItem: LocalOrderItem = {
+        ...targetItem,
+        price: targetItem.menuItem.price + modifiersAmount,
+        selectedModifiers: selectedModifiersValue,
+      }
+      const updatedItemKey = getOrderItemKey(updatedItem)
+      const matchingItem = currentItems.find(
+        (item) =>
+          getOrderItemKey(item) === updatedItemKey &&
+          getOrderItemKey(item) !== itemKey
+      )
+
+      if (matchingItem) {
+        return currentItems
+          .map((item) =>
+            getOrderItemKey(item) === updatedItemKey
+              ? { ...item, quantity: item.quantity + updatedItem.quantity }
+              : item
+          )
+          .filter((item) => getOrderItemKey(item) !== itemKey)
+      }
+
+      return currentItems.map((item) =>
+        getOrderItemKey(item) === itemKey ? updatedItem : item
+      )
+    })
+  }
+
   const handleAddItem = async (menuItem: MenuItem) => {
     try {
       setError(null)
+      if (import.meta.env.DEV) {
+        console.log('[modifiers] clicked item', menuItem.id, menuItem.name)
+      }
+
       const cachedGroups = modifierGroupsCache[menuItem.id]
       const modifierGroups =
         cachedGroups ?? (await getModifiersForMenuItem(menuItem.id))
+
+      if (import.meta.env.DEV) {
+        console.log('[modifiers] groups', modifierGroups)
+      }
 
       if (!cachedGroups) {
         setModifierGroupsCache((currentCache) => ({
@@ -314,16 +396,32 @@ export const TableOrderPage = () => {
       }
 
       if (modifierGroups.length > 0) {
+        if (import.meta.env.DEV) {
+          modifierGroups.forEach((group) => {
+            if (
+              isModifierGroupRequired(group) &&
+              getModifierGroupOptions(group).length === 0
+            ) {
+              console.error('[modifiers] required group has no options', group)
+            }
+          })
+        }
+
         setModifierMenuItem({
           ...menuItem,
           modifier_groups: modifierGroups,
         })
+        setModifierSheetMode('add')
+        setEditingOrderItemKey(null)
         setSelectedModifierOptions({})
         return
       }
 
       addOrderItem(menuItem)
     } catch (err) {
+      if (import.meta.env.DEV) {
+        console.error('[modifiers] fetch error', err)
+      }
       setError(
         err instanceof Error
           ? err.message
@@ -342,6 +440,51 @@ export const TableOrderPage = () => {
   ) => {
     if (event.key === 'Enter') {
       handleAddItemClick(menuItem)
+    }
+  }
+
+  const handleEditModifiers = async (itemKey: string) => {
+    const orderItem = orderItems.find((item) => getOrderItemKey(item) === itemKey)
+
+    if (!orderItem) {
+      return
+    }
+
+    try {
+      setError(null)
+      const cachedGroups = modifierGroupsCache[orderItem.menuItem.id]
+      const modifierGroups =
+        cachedGroups ?? (await getModifiersForMenuItem(orderItem.menuItem.id))
+
+      if (!cachedGroups) {
+        setModifierGroupsCache((currentCache) => ({
+          ...currentCache,
+          [orderItem.menuItem.id]: modifierGroups,
+        }))
+      }
+
+      if (modifierGroups.length === 0) {
+        return
+      }
+
+      setModifierMenuItem({
+        ...orderItem.menuItem,
+        modifier_groups: modifierGroups,
+      })
+      setModifierSheetMode('edit')
+      setEditingOrderItemKey(itemKey)
+      setSelectedModifierOptions(
+        getSelectedModifierGroupOptions(orderItem.selectedModifiers ?? [])
+      )
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.error('[modifiers] fetch error', err)
+      }
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Ошибка загрузки модификаторов'
+      )
     }
   }
 
@@ -382,20 +525,48 @@ export const TableOrderPage = () => {
     })
   }
 
-  const handleAddModifierItem = () => {
+  const handleSaveModifierItem = () => {
     if (!modifierMenuItem || !canAddModifierItem) {
       return
     }
 
-    addOrderItem(modifierMenuItem, selectedModifiers)
+    if (modifierSheetMode === 'edit' && editingOrderItemKey) {
+      updateOrderItemModifiers(editingOrderItemKey, selectedModifiers)
+    } else {
+      addOrderItem(modifierMenuItem, selectedModifiers)
+    }
+
     setModifierMenuItem(null)
+    setModifierSheetMode('add')
+    setEditingOrderItemKey(null)
     setSelectedModifierOptions({})
   }
 
   const handleCloseModifierSheet = () => {
     setModifierMenuItem(null)
+    setModifierSheetMode('add')
+    setEditingOrderItemKey(null)
     setSelectedModifierOptions({})
   }
+
+  useEffect(() => {
+    if (!modifierMenuItem) {
+      return
+    }
+
+    const handleEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setModifierMenuItem(null)
+        setModifierSheetMode('add')
+        setEditingOrderItemKey(null)
+        setSelectedModifierOptions({})
+      }
+    }
+
+    window.addEventListener('keydown', handleEscape)
+
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [modifierMenuItem])
 
   const handleQuantityChange = (itemKey: string, quantity: number) => {
     setOrderItems((currentItems) =>
@@ -442,7 +613,7 @@ export const TableOrderPage = () => {
       await updateOrderTotal(currentOrder.id, totalAmount, discountPercent)
       removeOrderDraft(table.id)
 
-      navigate('/orders')
+      navigate(`/orders/${currentOrder.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка сохранения заказа')
     } finally {
@@ -505,8 +676,13 @@ export const TableOrderPage = () => {
                         <div className="truncate text-sm font-medium">
                           {capitalizeFirstLetter(item.name)}
                         </div>
-                        <div className="mt-0.5 text-xs text-muted-foreground">
-                          {item.price} ₽
+                        <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                          <span>{item.price} ₽</span>
+                          {(modifierGroupsCache[item.id]?.length ?? 0) > 0 && (
+                            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+                              Настроить
+                            </span>
+                          )}
                         </div>
                       </div>
                       <Button
@@ -547,6 +723,14 @@ export const TableOrderPage = () => {
               onQuantityChange={handleQuantityChange}
               onNoteChange={handleNoteChange}
               onRemoveItem={handleRemoveItem}
+              onEditModifiers={handleEditModifiers}
+              canEditModifiers={(item) =>
+                Boolean(
+                  item.selectedModifiers?.length ||
+                    item.menuItem.modifier_groups?.length ||
+                    modifierGroupsCache[item.menuItem.id]?.length
+                )
+              }
             />
             <div className="rounded-2xl border border-border/70 bg-background/70 p-2">
               <div className="mb-2 text-xs font-medium text-muted-foreground">
@@ -575,7 +759,7 @@ export const TableOrderPage = () => {
         </Card>
       </div>
 
-      <div className="fixed inset-x-3 bottom-24 z-40 md:sticky md:bottom-4 md:inset-x-auto md:mx-auto md:mt-4 md:max-w-md">
+      <div className="fixed inset-x-3 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-40 md:sticky md:bottom-4 md:inset-x-auto md:mx-auto md:mt-4 md:max-w-md">
         <div className="rounded-3xl border border-white/70 bg-background/85 p-2 shadow-lg backdrop-blur-xl">
           <Button
             className="h-11 w-full rounded-2xl"
@@ -588,90 +772,141 @@ export const TableOrderPage = () => {
       </div>
 
       {modifierMenuItem && (
-        <div className="fixed inset-0 z-[90] flex items-end bg-black/45 p-2 sm:items-center sm:justify-center sm:p-4">
-          <div className="max-h-[86vh] w-full overflow-y-auto rounded-3xl border border-white/70 bg-background p-4 shadow-xl sm:max-w-md">
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="truncate text-base font-semibold">
-                  {capitalizeFirstLetter(modifierMenuItem.name)}
-                </h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Базовая цена: {formatAmount(modifierMenuItem.price)} ₽
-                </p>
-              </div>
-              <div className="shrink-0 rounded-2xl bg-muted px-3 py-1.5 text-sm font-semibold tabular-nums">
-                {formatAmount(modifierItemPrice)} ₽
-              </div>
+        <div
+          className="fixed inset-0 z-[120] flex items-end bg-black/50 px-2 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-6 sm:items-center sm:justify-center sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={handleCloseModifierSheet}
+        >
+          <div
+            className="flex max-h-[82vh] w-full flex-col overflow-hidden rounded-t-3xl border border-white/80 bg-white shadow-2xl sm:max-w-md sm:rounded-3xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="border-b border-border/60 px-4 pb-3 pt-3">
+              <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-slate-200" />
+              <h2 className="text-lg font-semibold leading-tight">
+                Настройка блюда
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {capitalizeFirstLetter(modifierMenuItem.name)}
+              </p>
             </div>
 
-            <div className="space-y-3">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
               {(modifierMenuItem.modifier_groups ?? []).map((group) => {
                 const maxSelect = getModifierGroupMaxSelect(group)
                 const selectedOptions = selectedModifierOptions[group.id] ?? []
                 const isRequired = isModifierGroupRequired(group)
+                const isSingleSelect = maxSelect === 1
+                const options = getModifierGroupOptions(group)
 
                 return (
                   <div
                     key={group.id}
-                    className="rounded-2xl border border-border/70 bg-muted/30 p-3"
+                    className="space-y-2 rounded-3xl border border-border/70 bg-background/70 p-3"
                   >
-                    <div className="mb-2 flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="truncate text-sm font-medium">
+                        <div className="truncate text-sm font-semibold">
                           {group.name}
                         </div>
-                        <div className="text-[11px] text-muted-foreground">
-                          {maxSelect === 1 ? 'Выберите один вариант' : `Можно выбрать до ${maxSelect}`}
+                        <div className="text-xs text-muted-foreground">
+                          {isSingleSelect
+                            ? 'Выберите 1'
+                            : `Можно выбрать до ${maxSelect}`}
                         </div>
                       </div>
-                      {isRequired && (
-                        <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary">
-                          Обязательно
-                        </span>
-                      )}
+
+                      <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
+                        {isRequired ? 'Обязательно' : 'Необязательно'}
+                      </span>
                     </div>
 
-                    <div className="space-y-1.5">
-                      {(group.modifier_options ?? []).map((option) => {
+                    {options.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-border/80 bg-white/70 px-3 py-4 text-sm text-muted-foreground">
+                        Нет доступных вариантов
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {options.map((option) => {
                         const isSelected = selectedOptions.includes(option.id)
-                        const inputType = maxSelect === 1 ? 'radio' : 'checkbox'
+                        const priceDelta = getModifierOptionPrice(option)
 
                         return (
-                          <label
+                          <button
                             key={option.id}
-                            className="flex min-h-10 cursor-pointer items-center gap-2 rounded-2xl bg-background/70 px-3 py-2 text-sm"
+                            type="button"
+                            className={[
+                              'flex min-h-14 w-full items-center gap-3 rounded-2xl border px-3 py-2 text-left transition-colors',
+                              isSelected
+                                ? 'border-blue-300 bg-blue-50 text-blue-950'
+                                : 'border-border/70 bg-background/80 hover:bg-muted/60',
+                            ].join(' ')}
+                            onClick={() =>
+                              handleModifierOptionChange(
+                                group,
+                                option.id,
+                                isSingleSelect ? true : !isSelected
+                              )
+                            }
                           >
-                            <input
-                              type={inputType}
-                              name={`modifier-${group.id}`}
-                              checked={isSelected}
-                              onChange={(event) =>
-                                handleModifierOptionChange(
-                                  group,
-                                  option.id,
-                                  event.target.checked
-                                )
-                              }
-                              className="h-4 w-4 accent-primary"
-                            />
-                            <span className="min-w-0 flex-1 truncate">
-                              {option.name}
-                            </span>
-                            {option.price_delta > 0 && (
-                              <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
-                                +{formatAmount(option.price_delta)} ₽
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium">
+                                {option.name}
                               </span>
-                            )}
-                          </label>
+                              {priceDelta > 0 && (
+                                <span className="mt-0.5 block text-xs text-muted-foreground">
+                                  +{formatAmount(priceDelta)} ₽
+                                </span>
+                              )}
+                            </span>
+
+                            <span
+                              className={[
+                                'flex h-5 w-5 shrink-0 items-center justify-center border',
+                                isSingleSelect ? 'rounded-full' : 'rounded-md',
+                                isSelected
+                                  ? 'border-blue-600 bg-blue-600'
+                                  : 'border-slate-300 bg-white',
+                              ].join(' ')}
+                              aria-hidden="true"
+                            >
+                              {isSelected && (
+                                <span
+                                  className={[
+                                    'block bg-white',
+                                    isSingleSelect
+                                      ? 'h-2 w-2 rounded-full'
+                                      : 'h-2.5 w-2.5 rounded-sm',
+                                  ].join(' ')}
+                                />
+                              )}
+                            </span>
+                          </button>
                         )
-                      })}
-                    </div>
+                        })}
+                      </div>
+                    )}
                   </div>
                 )
               })}
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 border-t border-border/70 bg-white/95 p-4 shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="text-muted-foreground">Итого</span>
+                <span className="text-lg font-semibold tabular-nums">
+                  {formatAmount(modifierItemPrice)} ₽
+                </span>
+              </div>
+              <Button
+                type="button"
+                className="h-12 rounded-2xl bg-slate-900 text-white hover:bg-slate-800"
+                disabled={!canAddModifierItem}
+                onClick={handleSaveModifierItem}
+              >
+                {modifierSheetMode === 'edit' ? 'Сохранить' : 'Добавить'}
+              </Button>
               <Button
                 type="button"
                 variant="outline"
@@ -679,14 +914,6 @@ export const TableOrderPage = () => {
                 onClick={handleCloseModifierSheet}
               >
                 Отмена
-              </Button>
-              <Button
-                type="button"
-                className="h-11 rounded-2xl"
-                disabled={!canAddModifierItem}
-                onClick={handleAddModifierItem}
-              >
-                Добавить
               </Button>
             </div>
           </div>

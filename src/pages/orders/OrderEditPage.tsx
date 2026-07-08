@@ -6,9 +6,15 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { capitalizeFirstLetter } from '@/lib/utils'
-import type { MenuItem } from '@/entities/menu/model/menu-item.model'
+import type {
+  MenuItem,
+  ModifierGroup,
+  SelectedModifier,
+} from '@/entities/menu/model/menu-item.model'
+import { isOrderClosed } from '@/entities/order/constants/order.constants'
 import { ordersApi } from '@/features/orders/api/ordersApi'
-import { getMenuItems } from '@/features/menu/api/menuApi'
+import { useAuth } from '@/features/auth/useAuth'
+import { getMenuItems, getModifiersForMenuItem } from '@/features/menu/api/menuApi'
 import {
   saveOrderItems,
   updateOrderTotal,
@@ -18,19 +24,139 @@ import {
 import { OrderReceiptItems } from '@/features/table-order/components/OrderReceiptItems'
 
 const DISCOUNT_OPTIONS = [5, 10, 20]
+type ModifierSheetMode = 'add' | 'edit'
+
+const formatAmount = (value: number) =>
+  new Intl.NumberFormat('ru-RU', {
+    maximumFractionDigits: 0,
+  }).format(value)
+
+const getModifierGroupMaxSelect = (group: ModifierGroup) =>
+  group.max_select ?? group.max_selected ?? 1
+
+const isModifierGroupRequired = (group: ModifierGroup) => Boolean(group.is_required)
+
+const getModifierGroupOptions = (group: ModifierGroup) =>
+  group.options ?? group.modifier_options ?? []
+
+const getModifierOptionPrice = (
+  option: NonNullable<ModifierGroup['modifier_options']>[number]
+) => option.price ?? option.price_delta ?? 0
+
+const getOrderItemKey = (item: LocalOrderItem) => {
+  const modifierKey = (item.selectedModifiers ?? [])
+    .map((modifier) => modifier.optionId ?? modifier.modifier_option_id)
+    .sort()
+    .join('|')
+
+  return modifierKey ? `${item.menuItem.id}:${modifierKey}` : item.menuItem.id
+}
+
+const getSelectedModifiersKey = (menuItemId: string, modifiers: SelectedModifier[]) => {
+  const modifierKey = modifiers
+    .map((modifier) => modifier.optionId ?? modifier.modifier_option_id)
+    .sort()
+    .join('|')
+
+  return modifierKey ? `${menuItemId}:${modifierKey}` : menuItemId
+}
+
+const getSelectedModifierGroupOptions = (modifiers: SelectedModifier[] = []) =>
+  modifiers.reduce<Record<string, string[]>>((acc, modifier) => {
+    const groupId = modifier.groupId ?? modifier.group_id
+    const optionId = modifier.optionId ?? modifier.modifier_option_id
+
+    if (!groupId || !optionId) {
+      return acc
+    }
+
+    acc[groupId] = [...(acc[groupId] ?? []), optionId]
+
+    return acc
+  }, {})
+
+type OrderEditDraft = {
+  orderItems: LocalOrderItem[]
+  discountPercent: number
+  search: string
+  updatedAt: number
+}
+
+const getOrderEditDraftKey = (orderId: string, userId: string) =>
+  `checkmate:order-edit-draft:${orderId}:${userId}`
+
+const readOrderEditDraft = (
+  orderId: string,
+  userId: string
+): OrderEditDraft | null => {
+  const rawDraft = sessionStorage.getItem(getOrderEditDraftKey(orderId, userId))
+
+  if (!rawDraft) {
+    return null
+  }
+
+  try {
+    const draft = JSON.parse(rawDraft) as Partial<OrderEditDraft>
+
+    if (!Array.isArray(draft.orderItems)) {
+      return null
+    }
+
+    return {
+      orderItems: draft.orderItems,
+      discountPercent: Number(draft.discountPercent) || 0,
+      search: draft.search ?? '',
+      updatedAt: draft.updatedAt ?? Date.now(),
+    }
+  } catch {
+    return null
+  }
+}
+
+const saveOrderEditDraft = (
+  orderId: string,
+  userId: string,
+  draft: Omit<OrderEditDraft, 'updatedAt'>
+) => {
+  sessionStorage.setItem(
+    getOrderEditDraftKey(orderId, userId),
+    JSON.stringify({
+      ...draft,
+      updatedAt: Date.now(),
+    })
+  )
+}
+
+const removeOrderEditDraft = (orderId: string, userId: string) => {
+  sessionStorage.removeItem(getOrderEditDraftKey(orderId, userId))
+}
 
 export const OrderEditPage = () => {
   const { orderId } = useParams<{ orderId: string }>()
   const navigate = useNavigate()
   const location = useLocation()
+  const { user, isLoading: isAuthLoading } = useAuth()
   const [order, setOrder] = useState<TableOrder | null>(null)
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [orderItems, setOrderItems] = useState<LocalOrderItem[]>([])
   const [discountPercent, setDiscountPercent] = useState(0)
   const [search, setSearch] = useState('')
+  const [modifierMenuItem, setModifierMenuItem] = useState<MenuItem | null>(null)
+  const [modifierSheetMode, setModifierSheetMode] =
+    useState<ModifierSheetMode>('add')
+  const [editingOrderItemKey, setEditingOrderItemKey] = useState<string | null>(
+    null
+  )
+  const [modifierGroupsCache, setModifierGroupsCache] = useState<
+    Record<string, ModifierGroup[]>
+  >({})
+  const [selectedModifierOptions, setSelectedModifierOptions] = useState<
+    Record<string, string[]>
+  >({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [draftRestored, setDraftRestored] = useState(false)
   const ordersBackTo =
     (location.state as { from?: string } | null)?.from ||
     `/orders${location.search}`
@@ -60,8 +186,63 @@ export const OrderEditPage = () => {
     [discountPercent, subtotalAmount]
   )
   const totalAmount = Math.max(subtotalAmount - discountAmount, 0)
+  const selectedModifiers = useMemo<SelectedModifier[]>(() => {
+    if (!modifierMenuItem) {
+      return []
+    }
+
+    return (modifierMenuItem.modifier_groups ?? []).flatMap((group) => {
+      const selectedOptionIds = selectedModifierOptions[group.id] ?? []
+      const options = getModifierGroupOptions(group)
+
+      return selectedOptionIds.flatMap((optionId) => {
+        const option = options.find(
+          (modifierOption) => modifierOption.id === optionId
+        )
+
+        if (!option) {
+          return []
+        }
+
+        const price = getModifierOptionPrice(option)
+
+        return [{
+          groupId: group.id,
+          groupName: group.name,
+          optionId: option.id,
+          optionName: option.name,
+          priceDelta: price,
+          group_id: group.id,
+          group_name: group.name,
+          modifier_option_id: option.id,
+          option_name: option.name,
+          price,
+        }]
+      })
+    })
+  }, [modifierMenuItem, selectedModifierOptions])
+  const modifierItemPrice = modifierMenuItem
+    ? modifierMenuItem.price +
+      selectedModifiers.reduce(
+        (total, modifier) => total + (modifier.priceDelta ?? modifier.price ?? 0),
+        0
+      )
+    : 0
+  const canSaveModifierItem = modifierMenuItem
+    ? (modifierMenuItem.modifier_groups ?? []).every((group) => {
+        if (!isModifierGroupRequired(group)) {
+          return true
+        }
+
+        return (selectedModifierOptions[group.id] ?? []).length > 0
+      })
+    : false
 
   useEffect(() => {
+    if (isAuthLoading) {
+      return
+    }
+
     const initOrder = async () => {
       try {
         setLoading(true)
@@ -71,28 +252,44 @@ export const OrderEditPage = () => {
           throw new Error('Заказ не найден')
         }
 
+        if (!user) {
+          throw new Error('Пользователь не авторизован')
+        }
+
         const { order: currentOrder, items } = await ordersApi.getOrderDetails(orderId)
+
+        if (isOrderClosed(currentOrder.status)) {
+          navigate(`/orders/${orderId}${location.search}`, {
+            replace: true,
+            state: { from: ordersBackTo },
+          })
+          return
+        }
+
         const menu = await getMenuItems()
+        const draft = readOrderEditDraft(orderId, user.id)
+        const loadedOrderItems = items.flatMap((item) => {
+          if (!item.menu_item) {
+            return []
+          }
+
+          return [{
+            id: item.id,
+            menuItem: item.menu_item,
+            quantity: item.quantity,
+            price: item.price,
+            note: item.note,
+            status: item.status as LocalOrderItem['status'],
+            selectedModifiers: item.selected_modifiers ?? [],
+          }]
+        })
 
         setOrder(currentOrder)
-        setDiscountPercent(currentOrder.discount_percent ?? 0)
+        setDiscountPercent(draft?.discountPercent ?? currentOrder.discount_percent ?? 0)
         setMenuItems(menu)
-        setOrderItems(
-          items.flatMap((item) => {
-            if (!item.menu_item) {
-              return []
-            }
-
-            return [{
-              id: item.id,
-              menuItem: item.menu_item,
-              quantity: item.quantity,
-              price: item.price,
-              note: item.note,
-              status: item.status as LocalOrderItem['status'],
-            }]
-          })
-        )
+        setOrderItems(draft?.orderItems ?? loadedOrderItems)
+        setSearch(draft?.search ?? '')
+        setDraftRestored(Boolean(draft))
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Ошибка загрузки заказа')
       } finally {
@@ -101,17 +298,39 @@ export const OrderEditPage = () => {
     }
 
     void initOrder()
-  }, [orderId])
+  }, [isAuthLoading, location.search, navigate, orderId, ordersBackTo, user])
 
-  const handleAddItem = (menuItem: MenuItem) => {
+  useEffect(() => {
+    if (!orderId || !user || loading || !order || isOrderClosed(order.status)) {
+      return
+    }
+
+    saveOrderEditDraft(orderId, user.id, {
+      orderItems,
+      discountPercent,
+      search,
+    })
+  }, [discountPercent, loading, order, orderId, orderItems, search, user])
+
+  const addOrderItem = (
+    menuItem: MenuItem,
+    selectedModifiersValue: SelectedModifier[] = []
+  ) => {
+    const itemKey = getSelectedModifiersKey(menuItem.id, selectedModifiersValue)
+    const modifiersAmount = selectedModifiersValue.reduce(
+      (total, modifier) => total + (modifier.priceDelta ?? modifier.price ?? 0),
+      0
+    )
+    const itemPrice = menuItem.price + modifiersAmount
+
     setOrderItems((currentItems) => {
       const existingItem = currentItems.find(
-        (item) => item.menuItem.id === menuItem.id
+        (item) => getOrderItemKey(item) === itemKey
       )
 
       if (existingItem) {
         return currentItems.map((item) =>
-          item.menuItem.id === menuItem.id
+          getOrderItemKey(item) === itemKey
             ? { ...item, quantity: item.quantity + 1 }
             : item
         )
@@ -119,17 +338,114 @@ export const OrderEditPage = () => {
 
       return [
         ...currentItems,
-        { menuItem, quantity: 1, price: menuItem.price, note: '' },
+        {
+          menuItem,
+          quantity: 1,
+          price: itemPrice,
+          note: '',
+          selectedModifiers: selectedModifiersValue,
+        },
       ]
     })
     setSearch('')
   }
 
-  const handleQuantityChange = (menuItemId: string, quantity: number) => {
+  const updateOrderItemModifiers = (
+    itemKey: string,
+    selectedModifiersValue: SelectedModifier[]
+  ) => {
+    setOrderItems((currentItems) => {
+      const targetItem = currentItems.find(
+        (item) => getOrderItemKey(item) === itemKey
+      )
+
+      if (!targetItem) {
+        return currentItems
+      }
+
+      const modifiersAmount = selectedModifiersValue.reduce(
+        (total, modifier) => total + (modifier.priceDelta ?? modifier.price ?? 0),
+        0
+      )
+      const updatedItem: LocalOrderItem = {
+        ...targetItem,
+        price: targetItem.menuItem.price + modifiersAmount,
+        selectedModifiers: selectedModifiersValue,
+      }
+      const updatedItemKey = getOrderItemKey(updatedItem)
+      const matchingItem = currentItems.find(
+        (item) =>
+          getOrderItemKey(item) === updatedItemKey &&
+          getOrderItemKey(item) !== itemKey
+      )
+
+      if (matchingItem) {
+        return currentItems
+          .map((item) =>
+            getOrderItemKey(item) === updatedItemKey
+              ? { ...item, quantity: item.quantity + updatedItem.quantity }
+              : item
+          )
+          .filter((item) => getOrderItemKey(item) !== itemKey)
+      }
+
+      return currentItems.map((item) =>
+        getOrderItemKey(item) === itemKey ? updatedItem : item
+      )
+    })
+  }
+
+  const handleAddItem = async (menuItem: MenuItem) => {
+    try {
+      setError(null)
+      if (import.meta.env.DEV) {
+        console.log('[modifiers] clicked item', menuItem.id, menuItem.name)
+      }
+
+      const cachedGroups = modifierGroupsCache[menuItem.id]
+      const modifierGroups =
+        cachedGroups ?? (await getModifiersForMenuItem(menuItem.id))
+
+      if (import.meta.env.DEV) {
+        console.log('[modifiers] groups', modifierGroups)
+      }
+
+      if (!cachedGroups) {
+        setModifierGroupsCache((currentCache) => ({
+          ...currentCache,
+          [menuItem.id]: modifierGroups,
+        }))
+      }
+
+      if (modifierGroups.length > 0) {
+        setModifierMenuItem({
+          ...menuItem,
+          modifier_groups: modifierGroups,
+        })
+        setModifierSheetMode('add')
+        setEditingOrderItemKey(null)
+        setSelectedModifierOptions({})
+        return
+      }
+
+      addOrderItem(menuItem)
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.error('[modifiers] fetch error', err)
+      }
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Ошибка загрузки модификаторов'
+      )
+    }
+  }
+
+  const handleQuantityChange = (itemKey: string, quantity: number) => {
     setOrderItems((currentItems) =>
       currentItems
         .map((item) =>
-          item.menuItem.id === menuItemId
+          getOrderItemKey(item) === itemKey
             ? { ...item, quantity: Math.max(quantity, 0) }
             : item
         )
@@ -137,19 +453,141 @@ export const OrderEditPage = () => {
     )
   }
 
-  const handleNoteChange = (menuItemId: string, note: string) => {
+  const handleNoteChange = (itemKey: string, note: string) => {
     setOrderItems((currentItems) =>
       currentItems.map((item) =>
-        item.menuItem.id === menuItemId ? { ...item, note } : item
+        getOrderItemKey(item) === itemKey ? { ...item, note } : item
       )
     )
   }
 
-  const handleRemoveItem = (menuItemId: string) => {
+  const handleRemoveItem = (itemKey: string) => {
     setOrderItems((currentItems) =>
-      currentItems.filter((item) => item.menuItem.id !== menuItemId)
+      currentItems.filter((item) => getOrderItemKey(item) !== itemKey)
     )
   }
+
+  const handleEditModifiers = async (itemKey: string) => {
+    const orderItem = orderItems.find((item) => getOrderItemKey(item) === itemKey)
+
+    if (!orderItem) {
+      return
+    }
+
+    try {
+      setError(null)
+      const cachedGroups = modifierGroupsCache[orderItem.menuItem.id]
+      const modifierGroups =
+        cachedGroups ?? (await getModifiersForMenuItem(orderItem.menuItem.id))
+
+      if (!cachedGroups) {
+        setModifierGroupsCache((currentCache) => ({
+          ...currentCache,
+          [orderItem.menuItem.id]: modifierGroups,
+        }))
+      }
+
+      if (modifierGroups.length === 0) {
+        return
+      }
+
+      setModifierMenuItem({
+        ...orderItem.menuItem,
+        modifier_groups: modifierGroups,
+      })
+      setModifierSheetMode('edit')
+      setEditingOrderItemKey(itemKey)
+      setSelectedModifierOptions(
+        getSelectedModifierGroupOptions(orderItem.selectedModifiers ?? [])
+      )
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.error('[modifiers] fetch error', err)
+      }
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Ошибка загрузки модификаторов'
+      )
+    }
+  }
+
+  const handleModifierOptionChange = (
+    group: ModifierGroup,
+    optionId: string,
+    checked: boolean
+  ) => {
+    const maxSelect = getModifierGroupMaxSelect(group)
+
+    setSelectedModifierOptions((currentOptions) => {
+      const currentGroupOptions = currentOptions[group.id] ?? []
+
+      if (maxSelect === 1) {
+        return {
+          ...currentOptions,
+          [group.id]: checked ? [optionId] : [],
+        }
+      }
+
+      if (!checked) {
+        return {
+          ...currentOptions,
+          [group.id]: currentGroupOptions.filter(
+            (currentOptionId) => currentOptionId !== optionId
+          ),
+        }
+      }
+
+      if (currentGroupOptions.includes(optionId)) {
+        return currentOptions
+      }
+
+      return {
+        ...currentOptions,
+        [group.id]: [...currentGroupOptions, optionId].slice(0, maxSelect),
+      }
+    })
+  }
+
+  const handleSaveModifierItem = () => {
+    if (!modifierMenuItem || !canSaveModifierItem) {
+      return
+    }
+
+    if (modifierSheetMode === 'edit' && editingOrderItemKey) {
+      updateOrderItemModifiers(editingOrderItemKey, selectedModifiers)
+    } else {
+      addOrderItem(modifierMenuItem, selectedModifiers)
+    }
+
+    setModifierMenuItem(null)
+    setModifierSheetMode('add')
+    setEditingOrderItemKey(null)
+    setSelectedModifierOptions({})
+  }
+
+  const handleCloseModifierSheet = () => {
+    setModifierMenuItem(null)
+    setModifierSheetMode('add')
+    setEditingOrderItemKey(null)
+    setSelectedModifierOptions({})
+  }
+
+  useEffect(() => {
+    if (!modifierMenuItem) {
+      return
+    }
+
+    const handleEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        handleCloseModifierSheet()
+      }
+    }
+
+    window.addEventListener('keydown', handleEscape)
+
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [modifierMenuItem])
 
   const handleSaveOrder = async () => {
     try {
@@ -160,8 +598,15 @@ export const OrderEditPage = () => {
         throw new Error('Заказ не найден')
       }
 
+      if (isOrderClosed(order.status)) {
+        throw new Error('Закрытый заказ нельзя редактировать')
+      }
+
       await saveOrderItems(order.id, orderItems)
       await updateOrderTotal(order.id, totalAmount, discountPercent)
+      if (user) {
+        removeOrderEditDraft(order.id, user.id)
+      }
       navigate(`/orders/${order.id}${location.search}`, {
         state: { from: ordersBackTo },
       })
@@ -172,7 +617,7 @@ export const OrderEditPage = () => {
     }
   }
 
-  if (loading) {
+  if (loading || isAuthLoading) {
     return <AppLoader />
   }
 
@@ -194,6 +639,12 @@ export const OrderEditPage = () => {
       {error && (
         <div className="mb-4 text-sm text-red-500">
           Ошибка: {error}
+        </div>
+      )}
+
+      {draftRestored && (
+        <div className="mb-4 rounded-2xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+          Восстановлены несохраненные изменения. Нажмите «Сохранить изменения», чтобы применить их.
         </div>
       )}
 
@@ -219,10 +670,10 @@ export const OrderEditPage = () => {
                       role="button"
                       tabIndex={0}
                       className="flex min-h-12 cursor-pointer items-center justify-between gap-2 border-b border-border/70 px-3 py-2 last:border-b-0 hover:bg-muted/70"
-                      onClick={() => handleAddItem(item)}
+                      onClick={() => void handleAddItem(item)}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter') {
-                          handleAddItem(item)
+                          void handleAddItem(item)
                         }
                       }}
                     >
@@ -240,7 +691,7 @@ export const OrderEditPage = () => {
                         className="h-8 w-8"
                         onClick={(event) => {
                           event.stopPropagation()
-                          handleAddItem(item)
+                          void handleAddItem(item)
                         }}
                         aria-label={`Добавить ${capitalizeFirstLetter(item.name)}`}
                       >
@@ -272,6 +723,14 @@ export const OrderEditPage = () => {
               onQuantityChange={handleQuantityChange}
               onNoteChange={handleNoteChange}
               onRemoveItem={handleRemoveItem}
+              onEditModifiers={handleEditModifiers}
+              canEditModifiers={(item) =>
+                Boolean(
+                  item.selectedModifiers?.length ||
+                    item.menuItem.modifier_groups?.length ||
+                    modifierGroupsCache[item.menuItem.id]?.length
+                )
+              }
             />
             <div className="rounded-2xl border border-border/70 bg-background/70 p-2">
               <div className="mb-2 text-xs font-medium text-muted-foreground">
@@ -300,7 +759,156 @@ export const OrderEditPage = () => {
         </Card>
       </div>
 
-      <div className="fixed inset-x-3 bottom-24 z-40 md:sticky md:bottom-4 md:inset-x-auto md:mx-auto md:mt-4 md:max-w-md">
+      {modifierMenuItem && (
+        <div
+          className="fixed inset-0 z-[120] flex items-end bg-black/50 px-2 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-6 sm:items-center sm:justify-center sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={handleCloseModifierSheet}
+        >
+          <div
+            className="flex max-h-[82vh] w-full flex-col overflow-hidden rounded-t-3xl border border-white/80 bg-white shadow-2xl sm:max-w-md sm:rounded-3xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="border-b border-border/60 px-4 pb-3 pt-3">
+              <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-slate-200" />
+              <h2 className="text-lg font-semibold leading-tight">
+                Настройка блюда
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {capitalizeFirstLetter(modifierMenuItem.name)}
+              </p>
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+              {(modifierMenuItem.modifier_groups ?? []).map((group) => {
+                const maxSelect = getModifierGroupMaxSelect(group)
+                const selectedOptions = selectedModifierOptions[group.id] ?? []
+                const isRequired = isModifierGroupRequired(group)
+                const isSingleSelect = maxSelect === 1
+                const options = getModifierGroupOptions(group)
+
+                return (
+                  <div
+                    key={group.id}
+                    className="space-y-2 rounded-3xl border border-border/70 bg-background/70 p-3"
+                  >
+                    <div className="flex min-w-0 items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold">
+                          {group.name}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {isSingleSelect
+                            ? 'Выберите 1'
+                            : `Можно выбрать до ${maxSelect}`}
+                        </div>
+                      </div>
+
+                      <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
+                        {isRequired ? 'Обязательно' : 'Необязательно'}
+                      </span>
+                    </div>
+
+                    {options.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-border/80 bg-white/70 px-3 py-4 text-sm text-muted-foreground">
+                        Нет доступных вариантов
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {options.map((option) => {
+                          const isSelected = selectedOptions.includes(option.id)
+                          const priceDelta = getModifierOptionPrice(option)
+
+                          return (
+                            <button
+                              key={option.id}
+                              type="button"
+                              className={[
+                                'flex min-h-14 w-full items-center gap-3 rounded-2xl border px-3 py-2 text-left transition-colors',
+                                isSelected
+                                  ? 'border-blue-300 bg-blue-50 text-blue-950'
+                                  : 'border-border/70 bg-background/80 hover:bg-muted/60',
+                              ].join(' ')}
+                              onClick={() =>
+                                handleModifierOptionChange(
+                                  group,
+                                  option.id,
+                                  isSingleSelect ? true : !isSelected
+                                )
+                              }
+                            >
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-sm font-medium">
+                                  {option.name}
+                                </span>
+                                {priceDelta > 0 && (
+                                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                                    +{formatAmount(priceDelta)} ₽
+                                  </span>
+                                )}
+                              </span>
+
+                              <span
+                                className={[
+                                  'flex h-5 w-5 shrink-0 items-center justify-center border',
+                                  isSingleSelect ? 'rounded-full' : 'rounded-md',
+                                  isSelected
+                                    ? 'border-blue-600 bg-blue-600'
+                                    : 'border-slate-300 bg-white',
+                                ].join(' ')}
+                                aria-hidden="true"
+                              >
+                                {isSelected && (
+                                  <span
+                                    className={[
+                                      'block bg-white',
+                                      isSingleSelect
+                                        ? 'h-2 w-2 rounded-full'
+                                        : 'h-2.5 w-2.5 rounded-sm',
+                                    ].join(' ')}
+                                  />
+                                )}
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 border-t border-border/70 bg-white/95 p-4 shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="text-muted-foreground">Итого</span>
+                <span className="text-lg font-semibold tabular-nums">
+                  {formatAmount(modifierItemPrice)} ₽
+                </span>
+              </div>
+              <Button
+                type="button"
+                className="h-12 rounded-2xl bg-slate-900 text-white hover:bg-slate-800"
+                disabled={!canSaveModifierItem}
+                onClick={handleSaveModifierItem}
+              >
+                {modifierSheetMode === 'edit' ? 'Сохранить' : 'Добавить'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 rounded-2xl"
+                onClick={handleCloseModifierSheet}
+              >
+                Отмена
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="fixed inset-x-3 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-40 md:sticky md:bottom-4 md:inset-x-auto md:mx-auto md:mt-4 md:max-w-md">
         <div className="rounded-3xl border border-white/70 bg-background/85 p-2 shadow-lg backdrop-blur-xl">
           <Button
             className="h-11 w-full rounded-2xl"
