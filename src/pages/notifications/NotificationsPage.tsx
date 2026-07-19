@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, CheckCheck, ChevronRight, Loader2, Megaphone } from 'lucide-react'
+import { Bell, CheckCheck, ChevronRight, Megaphone } from 'lucide-react'
 
 import { PageHeader } from '@/components/PageHeader'
 import { Badge } from '@/components/ui/badge'
@@ -11,6 +11,7 @@ import {
   type AppNotification,
   type AppUpdate,
 } from '@/features/notifications/api/notificationsApi'
+import { NotificationsSkeleton } from '@/shared/ui/skeletons'
 
 type NotificationsTab = 'personal' | 'updates'
 
@@ -148,6 +149,10 @@ export const NotificationsPage = () => {
     }
   }
 
+  if (loading) {
+    return <NotificationsSkeleton />
+  }
+
   return (
     <div className="container mx-auto max-w-3xl p-3 pb-28 md:p-6 md:pb-8">
       <PageHeader title="Уведомления" backTo="/profile" />
@@ -188,13 +193,7 @@ export const NotificationsPage = () => {
           </div>
         )}
 
-        {loading ? (
-          <Card className="rounded-3xl border-white/70 bg-white/85 shadow-sm backdrop-blur">
-            <CardContent className="flex min-h-40 items-center justify-center p-6">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </CardContent>
-          </Card>
-        ) : activeTab === 'personal' ? (
+        {activeTab === 'personal' ? (
           <div className="grid gap-3">
             {unreadCount > 0 && (
               <Button

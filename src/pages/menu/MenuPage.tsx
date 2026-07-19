@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 
-import { AppLoader } from '@/components/AppLoader'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -9,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import type { MenuItem } from '@/entities/menu/model/menu-item.model'
 import { getMenuItems } from '@/features/menu/api/menuApi'
 import { capitalizeFirstLetter, cn } from '@/lib/utils'
+import { MenuSkeleton } from '@/shared/ui/skeletons'
 
 type MenuCategory = 'main' | 'bar' | 'kids'
 
@@ -190,7 +190,7 @@ export const MenuPage = () => {
   }
 
   if (loading) {
-    return <AppLoader />
+    return <MenuSkeleton />
   }
 
   if (error) {

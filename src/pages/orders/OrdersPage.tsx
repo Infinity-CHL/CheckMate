@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { AppLoader } from '@/components/AppLoader'
 import { Button } from '@/components/ui/button'
 import { ORDER_STATUS, type OrderStatus } from '@/entities/order/constants/order.constants'
 import { OrderFilters } from '@/features/orders/components/OrderFilters'
 import { OrderList } from '@/features/orders/components/OrderList'
 import { useOrders } from '@/features/orders/hooks/useOrders'
+import { OrdersListSkeleton } from '@/shared/ui/skeletons'
 import { Plus } from 'lucide-react'
 
 type OrdersFilter = OrderStatus | 'all'
@@ -132,7 +132,7 @@ export const OrdersPage = () => {
   }
 
   if (loading) {
-    return <AppLoader />
+    return <OrdersListSkeleton />
   }
 
   if (error) {
