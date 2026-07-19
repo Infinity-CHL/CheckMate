@@ -12,7 +12,6 @@ import {
   XCircle,
 } from 'lucide-react'
 
-import { AppLoader } from '@/components/AppLoader'
 import { PageHeader } from '@/components/PageHeader'
 import { UserNiceAvatar } from '@/components/UserNiceAvatar'
 import { Button } from '@/components/ui/button'
@@ -28,6 +27,7 @@ import {
 import { OrderItemsTable } from '@/features/orders/components/OrderItemsTable'
 import { OrderStatusBadge } from '@/features/orders/components/OrderStatusBadge'
 import { useOrderDetails } from '@/features/orders/hooks/useOrderDetails'
+import { OrderDetailsSkeleton, Skeleton } from '@/shared/ui/skeletons'
 
 const roleLabels: Record<string, string> = {
   admin: 'Администратор',
@@ -229,7 +229,7 @@ export const OrderDetailsPage = () => {
   }
 
   if (loading) {
-    return <AppLoader />
+    return <OrderDetailsSkeleton />
   }
 
   if (error || !order) {
@@ -546,8 +546,19 @@ export const OrderDetailsPage = () => {
             </div>
 
             {loadingTransferUsers ? (
-              <div className="flex min-h-32 items-center justify-center">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              <div className="grid gap-2">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-3 rounded-2xl border border-border/80 bg-background/80 p-3"
+                  >
+                    <Skeleton className="h-10 w-10 rounded-full" />
+                    <div className="min-w-0 flex-1">
+                      <Skeleton className="h-4 w-36" />
+                      <Skeleton className="mt-2 h-3 w-24" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : transferUsers.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-border/80 bg-muted/30 px-3 py-8 text-center text-sm text-muted-foreground">

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { PageHeader } from '@/components/PageHeader'
-import { AppLoader } from '@/components/AppLoader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -22,6 +21,7 @@ import {
   type TableOrder,
 } from '@/features/table-order/api/tableOrderApi'
 import { OrderReceiptItems } from '@/features/table-order/components/OrderReceiptItems'
+import { OrderEditSkeleton } from '@/shared/ui/skeletons'
 
 const DISCOUNT_OPTIONS = [5, 10, 20]
 type ModifierSheetMode = 'add' | 'edit'
@@ -618,7 +618,7 @@ export const OrderEditPage = () => {
   }
 
   if (loading || isAuthLoading) {
-    return <AppLoader />
+    return <OrderEditSkeleton />
   }
 
   if (error && !order) {

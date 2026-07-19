@@ -25,6 +25,7 @@ import { useAuth } from '@/features/auth/useAuth'
 import { pushNotificationsApi } from '@/features/notifications/api/pushNotificationsApi'
 import { useUnreadNotificationsCount } from '@/features/notifications/hooks/useUnreadNotificationsCount'
 import { supabase } from '@/shared/api/supabase'
+import { ProfileSkeleton } from '@/shared/ui/skeletons'
 
 const roleLabels: Record<string, string> = {
   admin: 'Администратор',
@@ -131,7 +132,7 @@ const PasswordField = ({
 )
 
 export const ProfilePage = () => {
-  const { user, profile, signOut } = useAuth()
+  const { user, profile, signOut, isLoading } = useAuth()
   const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const initialName = splitFullName(profile?.full_name)
@@ -427,6 +428,10 @@ export const ProfilePage = () => {
         (navigator as Navigator & { standalone?: boolean }).standalone === true))
   const shouldShowIosHint =
     isAppleMobile && (!isPushSupported || !isStandalone)
+
+  if (isLoading) {
+    return <ProfileSkeleton />
+  }
 
   return (
     <div className="container mx-auto p-4">

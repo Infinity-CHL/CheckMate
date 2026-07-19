@@ -8,13 +8,13 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
-import { AppLoader } from '@/components/AppLoader'
 import { DateCalendar } from '@/components/DateCalendar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { dashboardApi, type DashboardPeriod } from '@/features/dashboard/api/dashboardApi'
 import { useDashboardStats } from '@/features/dashboard/hooks/useDashboardStats'
 import { useAuth } from '@/features/auth/useAuth'
+import { DashboardSkeleton } from '@/shared/ui/skeletons'
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('ru-RU', {
@@ -430,7 +430,7 @@ export const DashboardPage = () => {
   }, [normalizedHours, period, profile?.grade, stats.periodRevenue, stats.periodTips])
 
   if (loading) {
-    return <AppLoader />
+    return <DashboardSkeleton />
   }
 
   return (

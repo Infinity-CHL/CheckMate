@@ -1,6 +1,5 @@
 import { useState } from 'react'
 
-import { AppLoader } from '@/components/AppLoader'
 import { DateCalendar } from '@/components/DateCalendar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -12,6 +11,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useAdminDashboardStats } from '@/features/dashboard/hooks/useDashboardStats'
+import { AdminAnalyticsSkeleton } from '@/shared/ui/skeletons'
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('ru-RU', {
@@ -74,7 +74,7 @@ export const AdminAnalyticsPage = () => {
   const monthSummaryRange = formatMonthSummaryRange(selectedDate)
 
   if (loading) {
-    return <AppLoader />
+    return <AdminAnalyticsSkeleton />
   }
 
   return (

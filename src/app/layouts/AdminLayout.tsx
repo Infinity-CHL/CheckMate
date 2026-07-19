@@ -1,10 +1,10 @@
 import { BarChart3, LogOut, Users } from 'lucide-react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 
-import { AppLoader } from '@/components/AppLoader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuth } from '@/features/auth/useAuth'
+import { EmployeesSkeleton } from '@/shared/ui/skeletons'
 
 const navItems = [
   {
@@ -24,7 +24,13 @@ export const AdminLayout = () => {
   const isAdmin = profile?.role === 'admin'
 
   if (isLoading) {
-    return <AppLoader />
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-primary/5 px-4 py-6 md:px-8">
+        <div className="mx-auto w-full max-w-7xl">
+          <EmployeesSkeleton />
+        </div>
+      </div>
+    )
   }
 
   if (!isAdmin) {

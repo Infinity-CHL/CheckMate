@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { PageHeader } from '@/components/PageHeader'
-import { AppLoader } from '@/components/AppLoader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -32,6 +31,7 @@ import {
   removeOrderDraft,
   saveOrderDraft,
 } from '@/features/table-order/lib/orderDraftStorage'
+import { OrderEditSkeleton } from '@/shared/ui/skeletons'
 
 const DISCOUNT_OPTIONS = [5, 10, 20]
 type ModifierSheetMode = 'add' | 'edit'
@@ -623,7 +623,7 @@ export const TableOrderPage = () => {
   }
 
   if (loading || isAuthLoading) {
-    return <AppLoader />
+    return <OrderEditSkeleton />
   }
 
   if (error && !table) {

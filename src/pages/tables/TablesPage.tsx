@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
 
-import { AppLoader } from '@/components/AppLoader'
 import { Button } from '@/components/ui/button'
 import { TABLE_STATUS } from '@/entities/table/constants/table.constants'
 import { TableGrid } from '@/features/tables/components/TableGrid'
 import { useTables } from '@/features/tables/hooks/useTables'
+import { TableGridSkeleton } from '@/shared/ui/skeletons'
 
 type TableFilter = 'all' | 'free' | 'occupied'
 
@@ -38,7 +38,7 @@ export const TablesPage = () => {
   }, [activeFilter, tables])
 
   if (loading) {
-    return <AppLoader />
+    return <TableGridSkeleton />
   }
 
   if (error) {

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 
-import { AppLoader } from '@/components/AppLoader'
 import { UserNiceAvatar } from '@/components/UserNiceAvatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -24,6 +23,7 @@ import {
   type EmployeeRole,
 } from '@/features/admin/api/employeesApi'
 import { useAuth } from '@/features/auth/useAuth'
+import { EmployeesSkeleton } from '@/shared/ui/skeletons'
 
 const roleLabels: Record<EmployeeRole, string> = {
   admin: 'Администратор',
@@ -190,7 +190,7 @@ export const AdminEmployeesPage = () => {
   }
 
   if (loading) {
-    return <AppLoader />
+    return <EmployeesSkeleton />
   }
 
   return (
